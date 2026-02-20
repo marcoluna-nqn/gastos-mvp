@@ -41,7 +41,10 @@ export const ToastProvider = ({ children }: PropsWithChildren) => {
 
   const pushToast = useCallback(
     (toast: Omit<ToastMessage, 'id'>) => {
-      const id = crypto.randomUUID();
+      const id =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const nextToast: ToastMessage = { id, ...toast };
 
       setToasts((current) => [nextToast, ...current].slice(0, 4));
