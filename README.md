@@ -4,9 +4,7 @@ Aplicación web local-first para gestión de gastos personales. Permite registra
 
 ## URL publicada
 
-- GitHub Pages: `https://<TU_USUARIO>.github.io/<TU_REPO>/`
-
-La URL final queda activa luego del primer push a `main` y de que termine el workflow `Deploy to GitHub Pages`.
+- GitHub Pages: `https://marcoluna-nqn.github.io/gastos-mvp/`
 
 ## Funcionalidades
 
