@@ -1,4 +1,4 @@
-﻿import {
+import {
   useEffect,
   useMemo,
   useRef,
@@ -73,6 +73,19 @@ const getDefaultState = (
   note: '',
 });
 
+const ensureFieldVisible = (element: HTMLElement | null): void => {
+  if (!element) {
+    return;
+  }
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  element.scrollIntoView({
+    block: 'center',
+    inline: 'nearest',
+    behavior: prefersReducedMotion ? 'auto' : 'smooth',
+  });
+};
+
 const focusAmountInput = (input: HTMLInputElement | null, shouldSelect = true): void => {
   if (!input) {
     return;
@@ -82,6 +95,7 @@ const focusAmountInput = (input: HTMLInputElement | null, shouldSelect = true): 
   if (shouldSelect) {
     input.select();
   }
+  ensureFieldVisible(input);
 };
 
 const resolveCategoryChoice = (
@@ -149,7 +163,9 @@ export const MovementForm = ({
         editingMovement.note ||
           editingMovement.dueDate ||
           editingMovement.isPaymentReminder ||
-          editingMovement.isBill,
+          editingMovement.isBill ||
+          editingMovement.date !== todayIsoDate() ||
+          editingMovement.paymentMethod !== defaultPaymentMethod,
       ),
     );
     setQuickCategoryName('');
@@ -158,7 +174,7 @@ export const MovementForm = ({
     requestAnimationFrame(() => {
       focusAmountInput(amountInputRef.current, true);
     });
-  }, [editingMovement]);
+  }, [defaultPaymentMethod, editingMovement]);
 
   useEffect(() => {
     if (editingMovement) {
@@ -256,6 +272,7 @@ export const MovementForm = ({
     if (element instanceof HTMLInputElement && element.type === 'text') {
       element.select();
     }
+    ensureFieldVisible(element);
   };
 
   const focusFirstInvalidField = (nextErrors: ErrorState) => {
@@ -270,7 +287,10 @@ export const MovementForm = ({
     }
 
     if (nextErrors.date) {
-      focusElement(dateFieldRef.current);
+      setShowOptionalFields(true);
+      requestAnimationFrame(() => {
+        focusElement(dateFieldRef.current);
+      });
       return;
     }
 
@@ -313,7 +333,11 @@ export const MovementForm = ({
     }
   };
 
-  const handleAdvanceOnEnter = (event: KeyboardEvent<HTMLElement>, nextField: HTMLElement | null) => {
+  const handleAdvanceOnEnter = (
+    event: KeyboardEvent<HTMLElement>,
+    nextField: HTMLElement | null,
+    fallbackToSubmit = false,
+  ) => {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
       return;
     }
@@ -323,7 +347,25 @@ export const MovementForm = ({
     }
 
     event.preventDefault();
-    focusElement(nextField);
+    if (nextField) {
+      focusElement(nextField);
+      return;
+    }
+
+    if (fallbackToSubmit) {
+      const submitHost = event.currentTarget;
+      if (
+        submitHost instanceof HTMLInputElement ||
+        submitHost instanceof HTMLSelectElement ||
+        submitHost instanceof HTMLTextAreaElement ||
+        submitHost instanceof HTMLButtonElement
+      ) {
+        submitHost.form?.requestSubmit();
+        return;
+      }
+
+      submitHost.closest('form')?.requestSubmit();
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -409,7 +451,7 @@ export const MovementForm = ({
       const next = !current;
       if (next) {
         requestAnimationFrame(() => {
-          focusElement(dueDateFieldRef.current);
+          focusElement(dateFieldRef.current);
         });
       }
       return next;
@@ -489,97 +531,37 @@ export const MovementForm = ({
             value={form.amount}
             onChange={handleAmountChange}
             onBlur={handleAmountBlur}
-            onFocus={(event) => event.currentTarget.select()}
+            onFocus={(event) => {
+              event.currentTarget.select();
+              ensureFieldVisible(event.currentTarget);
+            }}
             onKeyDown={(event) => handleAdvanceOnEnter(event, categoryFieldRef.current)}
             aria-invalid={Boolean(errors.amount)}
           />
           {errors.amount ? <small className="error-text">{errors.amount}</small> : null}
         </label>
 
-        <div className="amount-quick-actions" role="group" aria-label="Montos rapidos">
-          {QUICK_AMOUNTS_ARS.map((amount) => (
-            <button key={amount} type="button" className="chip-button" onClick={() => handleQuickAmount(amount)}>
-              +{quickAmountFormatter.format(amount)}
-            </button>
-          ))}
-        </div>
-
-        <div className="form-grid">
-          <label className="form-field">
-            <span>Categoria</span>
-            <select
-              ref={categoryFieldRef}
-              className={`field ${errors.category ? 'field-error' : ''}`}
-              value={form.category}
-              onChange={(event) => setField('category', event.target.value)}
-              onKeyDown={(event) => handleAdvanceOnEnter(event, dateFieldRef.current)}
-              aria-invalid={Boolean(errors.category)}
-            >
-              {categoryOptions.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-            {errors.category ? <small className="error-text">{errors.category}</small> : null}
-          </label>
-
-          <label className="form-field">
-            <span>Fecha</span>
-            <input
-              ref={dateFieldRef}
-              className={`field ${errors.date ? 'field-error' : ''}`}
-              type="date"
-              enterKeyHint="next"
-              value={form.date}
-              onChange={(event) => setField('date', event.target.value)}
-              onKeyDown={(event) =>
-                handleAdvanceOnEnter(
-                  event,
-                  showOptionalFields ? dueDateFieldRef.current : amountInputRef.current,
-                )
-              }
-              aria-invalid={Boolean(errors.date)}
-            />
-            {errors.date ? <small className="error-text">{errors.date}</small> : null}
-          </label>
-        </div>
-
-        {onQuickCreateCategory ? (
-          <div className="quick-category-row">
-            <input
-              className={`field ${errors.quickCategory ? 'field-error' : ''}`}
-              type="text"
-              value={quickCategoryName}
-              onChange={(event) => {
-                setQuickCategoryName(event.target.value);
-                if (errors.quickCategory) {
-                  setErrors((current) => ({ ...current, quickCategory: undefined }));
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter') {
-                  return;
-                }
-                event.preventDefault();
-                void handleQuickCategoryCreate();
-              }}
-              placeholder="Nueva categoria (ej. Inversion)"
-              aria-label="Crear categoria rapida"
-            />
-            <button
-              type="button"
-              className="button button-secondary compact"
-              disabled={isCreatingCategory}
-              onClick={() => {
-                void handleQuickCategoryCreate();
-              }}
-            >
-              {isCreatingCategory ? 'Agregando...' : '+ Categoria'}
-            </button>
-          </div>
-        ) : null}
-        {errors.quickCategory ? <small className="error-text">{errors.quickCategory}</small> : null}
+        <label className="form-field">
+          <span>Categoria</span>
+          <select
+            ref={categoryFieldRef}
+            className={`field ${errors.category ? 'field-error' : ''}`}
+            value={form.category}
+            onChange={(event) => setField('category', event.target.value)}
+            onFocus={(event) => ensureFieldVisible(event.currentTarget)}
+            onKeyDown={(event) =>
+              handleAdvanceOnEnter(event, showOptionalFields ? dateFieldRef.current : null, !showOptionalFields)
+            }
+            aria-invalid={Boolean(errors.category)}
+          >
+            {categoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+          {errors.category ? <small className="error-text">{errors.category}</small> : null}
+        </label>
 
         <button
           type="button"
@@ -587,11 +569,72 @@ export const MovementForm = ({
           onClick={toggleOptionalFields}
           aria-expanded={showOptionalFields}
         >
-          {showOptionalFields ? 'Ocultar detalles opcionales' : 'Agregar vencimiento, metodo y nota'}
+          {showOptionalFields ? 'Ocultar opciones' : 'Mas opciones'}
         </button>
 
         {showOptionalFields ? (
           <div className="optional-fields">
+            <label className="form-field">
+              <span>Fecha</span>
+              <input
+                ref={dateFieldRef}
+                className={`field ${errors.date ? 'field-error' : ''}`}
+                type="date"
+                enterKeyHint="next"
+                value={form.date}
+                onChange={(event) => setField('date', event.target.value)}
+                onFocus={(event) => ensureFieldVisible(event.currentTarget)}
+                onKeyDown={(event) => handleAdvanceOnEnter(event, dueDateFieldRef.current)}
+                aria-invalid={Boolean(errors.date)}
+              />
+              {errors.date ? <small className="error-text">{errors.date}</small> : null}
+            </label>
+
+            <div className="amount-quick-actions" role="group" aria-label="Montos rapidos">
+              {QUICK_AMOUNTS_ARS.map((amount) => (
+                <button key={amount} type="button" className="chip-button" onClick={() => handleQuickAmount(amount)}>
+                  +{quickAmountFormatter.format(amount)}
+                </button>
+              ))}
+            </div>
+
+            {onQuickCreateCategory ? (
+              <div className="quick-category-row">
+                <input
+                  className={`field ${errors.quickCategory ? 'field-error' : ''}`}
+                  type="text"
+                  value={quickCategoryName}
+                  onChange={(event) => {
+                    setQuickCategoryName(event.target.value);
+                    if (errors.quickCategory) {
+                      setErrors((current) => ({ ...current, quickCategory: undefined }));
+                    }
+                  }}
+                  onFocus={(event) => ensureFieldVisible(event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') {
+                      return;
+                    }
+                    event.preventDefault();
+                    void handleQuickCategoryCreate();
+                  }}
+                  placeholder="Nueva categoria (ej. Inversion)"
+                  aria-label="Crear categoria rapida"
+                />
+                <button
+                  type="button"
+                  className="button button-secondary compact"
+                  disabled={isCreatingCategory}
+                  onClick={() => {
+                    void handleQuickCategoryCreate();
+                  }}
+                >
+                  {isCreatingCategory ? 'Agregando...' : '+ Categoria'}
+                </button>
+              </div>
+            ) : null}
+            {errors.quickCategory ? <small className="error-text">{errors.quickCategory}</small> : null}
+
             <div className="form-grid optional-grid">
               <label className="form-field">
                 <span>Vencimiento (opcional)</span>
@@ -602,6 +645,7 @@ export const MovementForm = ({
                   enterKeyHint="next"
                   value={form.dueDate}
                   onChange={(event) => setField('dueDate', event.target.value)}
+                  onFocus={(event) => ensureFieldVisible(event.currentTarget)}
                   onKeyDown={(event) => handleAdvanceOnEnter(event, reminderFieldRef.current)}
                   aria-invalid={Boolean(errors.dueDate)}
                 />
@@ -616,6 +660,7 @@ export const MovementForm = ({
                     type="checkbox"
                     checked={form.isPaymentReminder}
                     onChange={(event) => setField('isPaymentReminder', event.target.checked)}
+                    onFocus={(event) => ensureFieldVisible(event.currentTarget)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault();
@@ -635,6 +680,7 @@ export const MovementForm = ({
                 className={`field ${errors.paymentMethod ? 'field-error' : ''}`}
                 value={form.paymentMethod}
                 onChange={(event) => setField('paymentMethod', event.target.value)}
+                onFocus={(event) => ensureFieldVisible(event.currentTarget)}
                 onKeyDown={(event) => handleAdvanceOnEnter(event, noteFieldRef.current)}
                 aria-invalid={Boolean(errors.paymentMethod)}
               >
@@ -657,6 +703,7 @@ export const MovementForm = ({
                 enterKeyHint="done"
                 value={form.note}
                 onChange={(event) => setField('note', event.target.value)}
+                onFocus={(event) => ensureFieldVisible(event.currentTarget)}
                 onKeyDown={(event) => {
                   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                     event.preventDefault();
@@ -669,20 +716,14 @@ export const MovementForm = ({
           </div>
         ) : null}
 
-        <div className="actions-row">
+        <div className="actions-row movement-submit-row">
           {editingMovement ? (
             <button type="button" className="button button-secondary" onClick={handleCancelEdit}>
               Cancelar edicion
             </button>
           ) : null}
           <button type="submit" className="button button-primary" disabled={isSubmitting}>
-            {isSubmitting
-              ? 'Guardando...'
-              : editingMovement
-                ? 'Guardar cambios'
-                : form.type === 'gasto'
-                  ? 'Guardar gasto'
-                  : 'Guardar ingreso'}
+            {isSubmitting ? 'Guardando...' : editingMovement ? 'Guardar cambios' : 'Guardar'}
           </button>
         </div>
       </form>

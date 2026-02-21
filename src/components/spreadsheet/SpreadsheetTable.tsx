@@ -1092,13 +1092,13 @@ export const SpreadsheetTable = ({
   return (
     <section className="card spreadsheet-card">
       <header className="section-header history-header">
-        <h2>Modo planilla</h2>
+        <h2>Planilla (avanzado)</h2>
         <input
           className="field search-field"
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar categoria, fecha, nota o vencimiento"
+          placeholder="Buscar movimientos"
           aria-label="Buscar movimientos en planilla"
         />
       </header>

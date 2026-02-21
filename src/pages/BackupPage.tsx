@@ -45,9 +45,9 @@ export const BackupPage = ({ movements, filteredMovements, filters, onImportMove
   const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   const filterDescription = useMemo(() => {
-    return `Mes: ${resolveMonthLabel(filters.month)} · Categoria: ${
+    return `Mes: ${resolveMonthLabel(filters.month)} | Categoria: ${
       filters.category === 'all' ? 'Todas' : filters.category
-    } · Tipo: ${resolveTypeLabel(filters.type)}`;
+    } | Tipo: ${resolveTypeLabel(filters.type)}`;
   }, [filters]);
 
   const handleExportJson = () => {
@@ -55,7 +55,7 @@ export const BackupPage = ({ movements, filteredMovements, filters, onImportMove
     downloadTextFile(exportAsJson(movements), filename, 'application/json');
     pushToast({
       tone: 'success',
-      title: 'Backup JSON exportado',
+      title: 'JSON exportado',
       description: `Se descargo ${filename}.`,
     });
   };
@@ -105,7 +105,7 @@ export const BackupPage = ({ movements, filteredMovements, filters, onImportMove
       const importedCount = await onImportMovements(parsed, strategy);
       pushToast({
         tone: 'success',
-        title: 'Backup importado',
+        title: 'Datos importados',
         description: `Se importaron ${importedCount} movimientos.`,
       });
     } catch (error) {

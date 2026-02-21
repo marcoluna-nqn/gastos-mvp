@@ -1,5 +1,5 @@
-import { BudgetManager } from '../components/budgets/BudgetManager';
 import { useEffect, useMemo, useState } from 'react';
+import { BudgetManager } from '../components/budgets/BudgetManager';
 import { CategoryManager } from '../components/categories/CategoryManager';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { MovementForm } from '../components/movements/MovementForm';
@@ -67,6 +67,7 @@ export const MovementsPage = ({
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [budgetManagerOpen, setBudgetManagerOpen] = useState(false);
   const [onlyDuePayments, setOnlyDuePayments] = useState(false);
+  const [manageMenuOpen, setManageMenuOpen] = useState(false);
 
   const visibleMovements = useMemo(() => {
     const searched = applySearchFilter(movements, search);
@@ -74,15 +75,14 @@ export const MovementsPage = ({
       return searched;
     }
 
-    return searched.filter(
-      (movement) => Boolean(movement.dueDate),
-    );
+    return searched.filter((movement) => Boolean(movement.dueDate));
   }, [movements, onlyDuePayments, search]);
 
   useEffect(() => {
     if (viewMode === 'sheet') {
       setEditingMovement(null);
     }
+    setManageMenuOpen(false);
   }, [viewMode]);
 
   const handleSubmit = async (draft: MovementDraft) => {
@@ -206,44 +206,64 @@ export const MovementsPage = ({
             <div className="view-mode-actions">
               <button
                 type="button"
-                className="button button-secondary compact"
-                onClick={() => setCategoryManagerOpen(true)}
-              >
-                Categorias
-              </button>
-              <button
-                type="button"
-                className="button button-secondary compact"
-                onClick={() => setBudgetManagerOpen(true)}
-              >
-                Presupuestos
-              </button>
-              <button
-                type="button"
                 className={`button compact ${onlyDuePayments ? 'button-primary' : 'button-secondary'}`}
                 onClick={() => setOnlyDuePayments((current) => !current)}
                 aria-pressed={onlyDuePayments}
               >
-                {onlyDuePayments ? 'Mostrando vencimientos' : 'Solo pagos/vencimientos'}
+                {onlyDuePayments ? 'Ver todos' : 'Ver vencimientos'}
               </button>
-              <div className="segmented-control view-mode-control" role="tablist" aria-label="Cambiar vista">
+
+              <div className="manage-menu">
                 <button
                   type="button"
-                  className={`segmented-option ${viewMode === 'list' ? 'is-active' : ''}`}
-                  onClick={() => setViewMode('list')}
+                  className="button button-secondary compact"
+                  onClick={() => setManageMenuOpen((current) => !current)}
+                  aria-expanded={manageMenuOpen}
                 >
-                  Lista
+                  Gestionar
                 </button>
-                <button
-                  type="button"
-                  className={`segmented-option ${viewMode === 'sheet' ? 'is-active' : ''}`}
-                  onClick={() => setViewMode('sheet')}
-                >
-                  Planilla
-                </button>
+                {manageMenuOpen ? (
+                  <div className="manage-menu-panel" role="menu" aria-label="Gestion">
+                    <button
+                      type="button"
+                      className="button button-secondary compact"
+                      role="menuitem"
+                      onClick={() => {
+                        setCategoryManagerOpen(true);
+                        setManageMenuOpen(false);
+                      }}
+                    >
+                      Categorias
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-secondary compact"
+                      role="menuitem"
+                      onClick={() => {
+                        setBudgetManagerOpen(true);
+                        setManageMenuOpen(false);
+                      }}
+                    >
+                      Presupuestos
+                    </button>
+                  </div>
+                ) : null}
               </div>
+
+              <button
+                type="button"
+                className="button button-secondary compact"
+                onClick={() => setViewMode((current) => (current === 'list' ? 'sheet' : 'list'))}
+              >
+                {viewMode === 'list' ? 'Abrir planilla (avanzado)' : 'Volver a lista'}
+              </button>
             </div>
           </div>
+          <p className="view-mode-note">
+            {viewMode === 'list'
+              ? 'Usa Lista para el dia a dia. Planilla queda disponible para carga avanzada.'
+              : 'Modo planilla activo para edicion masiva.'}
+          </p>
         </section>
 
         {viewMode === 'list' ? (
@@ -273,7 +293,7 @@ export const MovementsPage = ({
       <ConfirmDialog
         open={movementToDelete !== null}
         title="Eliminar movimiento"
-        description="Esta accion no se puede deshacer. ¿Quieres eliminar el movimiento?"
+        description="Esta accion no se puede deshacer. Quieres eliminar el movimiento?"
         confirmLabel="Eliminar"
         onConfirm={handleDelete}
         onCancel={() => setMovementToDelete(null)}

@@ -17,7 +17,7 @@ interface AppLayoutProps extends PropsWithChildren {
 const NAV_LINKS = [
   { to: '/', label: 'Dashboard' },
   { to: '/movimientos', label: 'Movimientos' },
-  { to: '/backup', label: 'Backup' },
+  { to: '/backup', label: 'Exportar' },
 ];
 
 export const AppLayout = ({
@@ -31,6 +31,7 @@ export const AppLayout = ({
 }: AppLayoutProps) => {
   const location = useLocation();
   const showFilters = location.pathname !== '/backup';
+  const compactFilters = location.pathname === '/movimientos';
 
   return (
     <div className="app-shell">
@@ -56,7 +57,13 @@ export const AppLayout = ({
       </nav>
 
       {showFilters ? (
-        <FilterBar filters={filters} categories={categories} months={months} onChange={onFilterChange} />
+        <FilterBar
+          filters={filters}
+          categories={categories}
+          months={months}
+          compact={compactFilters}
+          onChange={onFilterChange}
+        />
       ) : null}
 
       <main className="page-content">{children}</main>

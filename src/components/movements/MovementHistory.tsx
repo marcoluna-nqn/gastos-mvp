@@ -1,4 +1,4 @@
-﻿import type { MovementRecord } from '../../types/movement';
+import type { MovementRecord } from '../../types/movement';
 import { formatArs } from '../../utils/currency';
 import { formatDisplayDate, todayIsoDate } from '../../utils/date';
 import { getDueStatusLabel, isReminderMovement, resolveDueStatus } from '../../utils/reminders';
@@ -32,7 +32,7 @@ export const MovementHistory = ({
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar categoria, fecha, nota o vencimiento"
+          placeholder="Buscar movimientos"
           aria-label="Buscar movimientos"
         />
       </header>
