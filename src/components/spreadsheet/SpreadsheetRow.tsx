@@ -24,12 +24,14 @@ interface SpreadsheetRowProps {
   onActivateCell: (position: SpreadsheetCellPosition) => void;
   onNavigateFromCell: (position: SpreadsheetCellPosition, intent: SpreadsheetNavigationIntent) => void;
   onChangeActiveValue: (value: string) => void;
-  onCommitActiveCell: (intent: SpreadsheetNavigationIntent) => void;
+  onCommitActiveCell: (intent: SpreadsheetNavigationIntent) => Promise<void>;
   onCancelActiveCell: () => void;
   onDeleteRequest: (movement: MovementRecord) => void;
+  onDuplicateRequest: (movement: MovementRecord) => Promise<number | null>;
   onSaveDraft: () => void;
   onDiscardDraft: () => void;
   isSavingDraft: boolean;
+  isHighlighted?: boolean;
 }
 
 export const SpreadsheetRow = ({
@@ -47,14 +49,20 @@ export const SpreadsheetRow = ({
   onCommitActiveCell,
   onCancelActiveCell,
   onDeleteRequest,
+  onDuplicateRequest,
   onSaveDraft,
   onDiscardDraft,
   isSavingDraft,
+  isHighlighted = false,
 }: SpreadsheetRowProps) => {
   const movement = row.movement;
 
   return (
-    <tr className={row.isDraft ? 'spreadsheet-row is-draft' : 'spreadsheet-row'}>
+    <tr
+      className={`spreadsheet-row ${row.isDraft ? 'is-draft' : ''} ${
+        isHighlighted ? 'is-highlighted' : ''
+      }`}
+    >
       {columns.map((column) => {
         const position: SpreadsheetCellPosition = { rowKey: row.key, column };
         const isActive = activeCell?.rowKey === row.key && activeCell.column === column;
@@ -93,13 +101,24 @@ export const SpreadsheetRow = ({
             </button>
           </div>
         ) : movement ? (
-          <button
-            type="button"
-            className="button button-danger ghost compact"
-            onClick={() => onDeleteRequest(movement)}
-          >
-            Eliminar
-          </button>
+          <div className="sheet-actions">
+            <button
+              type="button"
+              className="button button-secondary compact"
+              onClick={() => {
+                void onDuplicateRequest(movement);
+              }}
+            >
+              Duplicar
+            </button>
+            <button
+              type="button"
+              className="button button-danger ghost compact"
+              onClick={() => onDeleteRequest(movement)}
+            >
+              Eliminar
+            </button>
+          </div>
         ) : null}
       </td>
     </tr>

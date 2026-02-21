@@ -22,6 +22,11 @@ Aplicacion web local-first para gestion de gastos personales. Permite registrar 
   - Edicion por celda (click/tap)
   - Enter, Tab, Shift+Tab y Escape para flujo rapido
   - Fila rapida `+ Nueva fila` con guardado inline
+  - Pegado multiple tabular (TSV/Excel) con resumen de filas validas e invalidas
+- Categorias personalizadas persistidas en Dexie:
+  - Crear, editar y eliminar desde "Gestionar categorias"
+  - Al eliminar una categoria, movimientos reasignados automaticamente a "Otros"
+- Duplicado rapido de movimientos (vista lista y planilla)
 - Persistencia real en `IndexedDB` con Dexie.
 - Import/Export:
   - Export JSON (backup completo de toda la base local)
@@ -54,11 +59,13 @@ Aplicacion web local-first para gestion de gastos personales. Permite registrar 
 ```txt
 src/
   components/
+    categories/
     common/
     dashboard/
     filters/
     layout/
     movements/
+    spreadsheet/
   pages/
   hooks/
   db/

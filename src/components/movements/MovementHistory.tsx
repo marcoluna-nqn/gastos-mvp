@@ -9,6 +9,7 @@ interface MovementHistoryProps {
   onSearchChange: (value: string) => void;
   onEdit: (movement: MovementRecord) => void;
   onDeleteRequest: (movement: MovementRecord) => void;
+  onDuplicate: (movement: MovementRecord) => Promise<number | null>;
 }
 
 export const MovementHistory = ({
@@ -17,6 +18,7 @@ export const MovementHistory = ({
   onSearchChange,
   onEdit,
   onDeleteRequest,
+  onDuplicate,
 }: MovementHistoryProps) => {
   return (
     <section className="card">
@@ -27,13 +29,13 @@ export const MovementHistory = ({
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por categoría, nota o fecha"
+          placeholder="Buscar por categoria, nota o fecha"
           aria-label="Buscar movimientos"
         />
       </header>
 
       {movements.length === 0 ? (
-        <EmptyState title="No hay movimientos" description="Cuando cargues ingresos o gastos, aparecerán acá." />
+        <EmptyState title="No hay movimientos" description="Cuando cargues ingresos o gastos, apareceran aca." />
       ) : (
         <ul className="movement-list">
           {movements.map((movement) => (
@@ -58,6 +60,15 @@ export const MovementHistory = ({
                 <div className="actions-row compact">
                   <button type="button" className="button button-secondary" onClick={() => onEdit(movement)}>
                     Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => {
+                      void onDuplicate(movement);
+                    }}
+                  >
+                    Duplicar
                   </button>
                   <button
                     type="button"

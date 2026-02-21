@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { ToastViewport } from './components/common/ToastViewport';
-import { DEFAULT_FILTERS, INITIAL_CATEGORIES, INITIAL_PAYMENT_METHODS } from './constants/options';
+import { DEFAULT_FILTERS, INITIAL_PAYMENT_METHODS } from './constants/options';
+import { useCategories } from './hooks/useCategories';
 import { useMovements } from './hooks/useMovements';
 import { useTheme } from './hooks/useTheme';
 import { BackupPage } from './pages/BackupPage';
@@ -24,6 +25,12 @@ function App() {
   const [filters, setFilters] = useState<MovementFilters>(DEFAULT_FILTERS);
   const { theme, toggleTheme } = useTheme();
   const {
+    categories: categoryRecords,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+  } = useCategories();
+  const {
     movements,
     loading,
     createMovement,
@@ -33,8 +40,10 @@ function App() {
   } = useMovements();
 
   const categories = useMemo(() => {
-    return buildUniqueSorted([...INITIAL_CATEGORIES, ...movements.map((entry) => entry.category)]);
-  }, [movements]);
+    const fromCategories = categoryRecords.map((entry) => entry.name);
+    const fromMovements = movements.map((entry) => entry.category);
+    return buildUniqueSorted([...fromCategories, ...fromMovements]);
+  }, [categoryRecords, movements]);
 
   const paymentMethods = useMemo(() => {
     return buildUniqueSorted([...INITIAL_PAYMENT_METHODS, ...movements.map((entry) => entry.paymentMethod)]);
@@ -64,10 +73,14 @@ function App() {
               <MovementsPage
                 movements={filteredMovements}
                 categories={categories}
+                categoryRecords={categoryRecords}
                 paymentMethods={paymentMethods}
                 onCreateMovement={createMovement}
                 onUpdateMovement={updateMovement}
                 onDeleteMovement={deleteMovement}
+                onCreateCategory={createCategory}
+                onUpdateCategory={updateCategory}
+                onDeleteCategory={deleteCategory}
               />
             }
           />

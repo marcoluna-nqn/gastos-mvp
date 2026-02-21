@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ClipboardEvent } from 'react';
+import { DEFAULT_CATEGORY_NAME } from '../../constants/options';
 import { useToast } from '../../hooks/useToast';
 import { useSpreadsheetNavigation } from '../../hooks/useSpreadsheetNavigation';
 import type { MovementDraft, MovementRecord, MovementType } from '../../types/movement';
@@ -21,9 +22,19 @@ interface SpreadsheetTableProps {
   categories: string[];
   paymentMethods: string[];
   onSearchChange: (value: string) => void;
-  onCreateMovement: (draft: MovementDraft) => Promise<unknown>;
+  onCreateMovement: (draft: MovementDraft) => Promise<number>;
   onUpdateMovement: (id: number, draft: MovementDraft) => Promise<void>;
   onDeleteRequest: (movement: MovementRecord) => void;
+  onDuplicateMovement: (movement: MovementRecord) => Promise<number | null>;
+}
+
+interface LooseRowInput {
+  type: string;
+  amountInput: string;
+  category: string;
+  date: string;
+  paymentMethod: string;
+  note: string;
 }
 
 const SPREADSHEET_COLUMNS: SpreadsheetColumnKey[] = [
@@ -49,6 +60,15 @@ const TYPE_LABELS: Record<MovementType, string> = {
   gasto: 'Gasto',
 };
 
+const parseMovementIdFromRowKey = (rowKey: string): number | null => {
+  if (!rowKey.startsWith('m-')) {
+    return null;
+  }
+
+  const parsed = Number(rowKey.slice(2));
+  return Number.isInteger(parsed) ? parsed : null;
+};
+
 const isValidIsoDate = (value: string): boolean => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -64,8 +84,96 @@ const isValidIsoDate = (value: string): boolean => {
   );
 };
 
-const isMovementType = (value: string): value is MovementType => {
-  return value === 'ingreso' || value === 'gasto';
+const padTwo = (value: string): string => value.padStart(2, '0');
+
+const normalizeFlexibleDateInput = (value: string): string | null => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (isValidIsoDate(trimmed)) {
+    return trimmed;
+  }
+
+  const withSlash = trimmed.match(/^(\d{1,2})[/. -](\d{1,2})[/. -](\d{4})$/);
+  if (withSlash) {
+    const iso = `${withSlash[3]}-${padTwo(withSlash[2])}-${padTwo(withSlash[1])}`;
+    return isValidIsoDate(iso) ? iso : null;
+  }
+
+  const yearFirst = trimmed.match(/^(\d{4})[/. -](\d{1,2})[/. -](\d{1,2})$/);
+  if (yearFirst) {
+    const iso = `${yearFirst[1]}-${padTwo(yearFirst[2])}-${padTwo(yearFirst[3])}`;
+    return isValidIsoDate(iso) ? iso : null;
+  }
+
+  return null;
+};
+
+const normalizeTypeInput = (value: string): MovementType | null => {
+  const normalized = value
+    .trim()
+    .toLocaleLowerCase('es')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (
+    normalized === 'ingreso' ||
+    normalized === 'ingresos' ||
+    normalized === 'i' ||
+    normalized === 'income'
+  ) {
+    return 'ingreso';
+  }
+
+  if (
+    normalized === 'gasto' ||
+    normalized === 'gastos' ||
+    normalized === 'egreso' ||
+    normalized === 'egresos' ||
+    normalized === 'g' ||
+    normalized === 'expense'
+  ) {
+    return 'gasto';
+  }
+
+  return null;
+};
+
+const parseClipboardMatrix = (rawText: string): string[][] => {
+  const normalized = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rows = normalized.split('\n');
+  while (rows.length > 0 && !rows[rows.length - 1].trim()) {
+    rows.pop();
+  }
+
+  const matrix = rows
+    .map((row) => row.split('\t'))
+    .filter((row) => row.some((cell) => cell.trim().length > 0));
+
+  if (matrix.length === 0) {
+    return [];
+  }
+
+  const firstRow = matrix[0].map((cell) =>
+    cell
+      .trim()
+      .toLocaleLowerCase('es')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, ''),
+  );
+
+  const looksLikeHeader =
+    firstRow[0] === 'fecha' &&
+    firstRow[1]?.startsWith('tipo') &&
+    firstRow[4]?.startsWith('monto');
+
+  return looksLikeHeader ? matrix.slice(1) : matrix;
 };
 
 const buildMovementDraftFromRecord = (movement: MovementRecord): MovementDraft => ({
@@ -77,11 +185,29 @@ const buildMovementDraftFromRecord = (movement: MovementRecord): MovementDraft =
   note: movement.note,
 });
 
+const buildLooseRowFromMovement = (movement: MovementRecord): LooseRowInput => ({
+  type: movement.type,
+  amountInput: formatAmountFromCents(movement.amountCents, { currency: false }),
+  category: movement.category,
+  date: movement.date,
+  paymentMethod: movement.paymentMethod,
+  note: movement.note ?? '',
+});
+
+const createLooseDefaultRow = (categories: string[], paymentMethods: string[]): LooseRowInput => ({
+  type: 'gasto',
+  amountInput: '',
+  category: categories[0] ?? DEFAULT_CATEGORY_NAME,
+  date: todayIsoDate(),
+  paymentMethod: paymentMethods[0] ?? 'Efectivo',
+  note: '',
+});
+
 const createDraftRow = (categories: string[], paymentMethods: string[]): SpreadsheetDraftRow => ({
   key: `draft-${Date.now()}`,
   type: 'gasto',
   amountInput: '',
-  category: categories[0] ?? 'Otros',
+  category: categories[0] ?? DEFAULT_CATEGORY_NAME,
   date: todayIsoDate(),
   paymentMethod: paymentMethods[0] ?? 'Efectivo',
   note: '',
@@ -102,6 +228,81 @@ const trimOrFallback = (value: string, fallback: string): string => {
   return trimmed ? trimmed : fallback;
 };
 
+const buildMovementDraftFromLooseRow = (
+  row: LooseRowInput,
+  options: { defaultCategory: string; defaultPaymentMethod: string },
+): { draft: MovementDraft | null; errors: Partial<Record<SpreadsheetColumnKey, string>> } => {
+  const errors: Partial<Record<SpreadsheetColumnKey, string>> = {};
+
+  const normalizedType = normalizeTypeInput(row.type);
+  if (!normalizedType) {
+    errors.type = 'Tipo invalido.';
+  }
+
+  const normalizedDate = normalizeFlexibleDateInput(row.date);
+  if (!normalizedDate) {
+    errors.date = 'Fecha invalida.';
+  }
+
+  const amountCents = parseAmountToCents(row.amountInput);
+  if (amountCents === null || amountCents <= 0) {
+    errors.amount = 'Monto invalido. Usa un numero mayor a 0.';
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { draft: null, errors };
+  }
+
+  return {
+    draft: {
+      type: normalizedType!,
+      amountCents: amountCents!,
+      category: trimOrFallback(row.category, options.defaultCategory),
+      date: normalizedDate!,
+      paymentMethod: trimOrFallback(row.paymentMethod, options.defaultPaymentMethod),
+      note: row.note.trim() || undefined,
+    },
+    errors,
+  };
+};
+
+const applyPasteValueToLooseRow = (
+  row: LooseRowInput,
+  column: SpreadsheetColumnKey,
+  value: string,
+): LooseRowInput => {
+  const next = { ...row };
+  const trimmed = value.trim();
+
+  if (column === 'amount') {
+    next.amountInput = normalizeAmountInput(value);
+    return next;
+  }
+
+  if (column === 'date') {
+    next.date = normalizeFlexibleDateInput(value) ?? trimmed;
+    return next;
+  }
+
+  if (column === 'type') {
+    next.type = normalizeTypeInput(value) ?? trimmed;
+    return next;
+  }
+
+  if (column === 'category') {
+    next.category = trimmed;
+    return next;
+  }
+
+  if (column === 'paymentMethod') {
+    next.paymentMethod = trimmed;
+    return next;
+  }
+
+  next.note = value;
+  return next;
+};
+
 export const SpreadsheetTable = ({
   movements,
   search,
@@ -111,6 +312,7 @@ export const SpreadsheetTable = ({
   onCreateMovement,
   onUpdateMovement,
   onDeleteRequest,
+  onDuplicateMovement,
 }: SpreadsheetTableProps) => {
   const { pushToast } = useToast();
   const [draftRow, setDraftRow] = useState<SpreadsheetDraftRow | null>(null);
@@ -120,6 +322,8 @@ export const SpreadsheetTable = ({
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isUpdatingCell, setIsUpdatingCell] = useState(false);
+  const [pendingFocusMovementId, setPendingFocusMovementId] = useState<number | null>(null);
+  const [highlightedRowKeys, setHighlightedRowKeys] = useState<string[]>([]);
 
   const rows = useMemo<SpreadsheetRenderableRow[]>(() => {
     const mappedRows = movements
@@ -147,6 +351,13 @@ export const SpreadsheetTable = ({
   const rowKeys = useMemo(() => rows.map((row) => row.key), [rows]);
   const moveFrom = useSpreadsheetNavigation(rowKeys, SPREADSHEET_COLUMNS);
   const rowsByKey = useMemo(() => new Map(rows.map((row) => [row.key, row])), [rows]);
+  const defaults = useMemo(
+    () => ({
+      category: categories[0] ?? DEFAULT_CATEGORY_NAME,
+      paymentMethod: paymentMethods[0] ?? 'Efectivo',
+    }),
+    [categories, paymentMethods],
+  );
 
   useEffect(() => {
     if (!activeCell) {
@@ -159,6 +370,51 @@ export const SpreadsheetTable = ({
       setOriginValue('');
     }
   }, [activeCell, rowsByKey]);
+
+  useEffect(() => {
+    if (!pendingFocusMovementId) {
+      return;
+    }
+
+    const rowKey = `m-${pendingFocusMovementId}`;
+    const row = rowsByKey.get(rowKey);
+    if (!row) {
+      return;
+    }
+
+    const value = row.movement
+      ? formatAmountFromCents(row.movement.amountCents, { currency: false })
+      : '';
+    setActiveCell({ rowKey, column: 'amount' });
+    setEditValue(value);
+    setOriginValue(value);
+    setPendingFocusMovementId(null);
+    setHighlightedRowKeys((current) => [...new Set([...current, rowKey])]);
+  }, [pendingFocusMovementId, rowsByKey]);
+
+  useEffect(() => {
+    if (!pendingFocusMovementId) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPendingFocusMovementId(null);
+    }, 1600);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pendingFocusMovementId]);
+
+  useEffect(() => {
+    if (highlightedRowKeys.length === 0) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHighlightedRowKeys([]);
+    }, 1200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [highlightedRowKeys]);
 
   const clearCellError = (rowKey: string, column: SpreadsheetColumnKey) => {
     const targetKey = makeCellErrorKey(rowKey, column);
@@ -244,12 +500,14 @@ export const SpreadsheetTable = ({
         return formatArs(parsed);
       }
 
-      if (column === 'type' && isMovementType(rawValue)) {
-        return TYPE_LABELS[rawValue];
+      if (column === 'type') {
+        const normalizedType = normalizeTypeInput(rawValue);
+        return normalizedType ? TYPE_LABELS[normalizedType] : rawValue;
       }
 
-      if (column === 'date' && isValidIsoDate(rawValue)) {
-        return formatDisplayDate(rawValue);
+      if (column === 'date') {
+        const normalizedDate = normalizeFlexibleDateInput(rawValue);
+        return normalizedDate ? formatDisplayDate(normalizedDate) : rawValue;
       }
 
       return rawValue;
@@ -339,116 +597,40 @@ export const SpreadsheetTable = ({
     column: SpreadsheetColumnKey,
     inputValue: string,
   ): { draft: MovementDraft | null; error?: string } => {
-    const current = buildMovementDraftFromRecord(movement);
-    const trimmedValue = inputValue.trim();
-    const defaults = {
-      category: categories[0] ?? 'Otros',
-      paymentMethod: paymentMethods[0] ?? 'Efectivo',
-    };
+    const current = buildLooseRowFromMovement(movement);
+    const nextRow = applyPasteValueToLooseRow(current, column, inputValue);
+    const parsed = buildMovementDraftFromLooseRow(nextRow, {
+      defaultCategory: defaults.category,
+      defaultPaymentMethod: defaults.paymentMethod,
+    });
 
-    if (column === 'amount') {
-      const parsed = parseAmountToCents(inputValue);
-      if (parsed === null || parsed <= 0) {
-        return { draft: null, error: 'Monto invalido. Usa un numero mayor a 0.' };
-      }
-
+    if (!parsed.draft) {
       return {
-        draft: {
-          ...current,
-          amountCents: parsed,
-        },
+        draft: null,
+        error: parsed.errors[column] ?? 'Valor invalido.',
       };
     }
 
-    if (column === 'date') {
-      if (!isValidIsoDate(trimmedValue)) {
-        return { draft: null, error: 'Fecha invalida. Usa formato YYYY-MM-DD.' };
-      }
-
-      return {
-        draft: {
-          ...current,
-          date: trimmedValue,
-        },
-      };
-    }
-
-    if (column === 'type') {
-      if (!isMovementType(trimmedValue)) {
-        return { draft: null, error: 'Tipo invalido.' };
-      }
-
-      return {
-        draft: {
-          ...current,
-          type: trimmedValue,
-        },
-      };
-    }
-
-    if (column === 'category') {
-      return {
-        draft: {
-          ...current,
-          category: trimOrFallback(trimmedValue, defaults.category),
-        },
-      };
-    }
-
-    if (column === 'paymentMethod') {
-      return {
-        draft: {
-          ...current,
-          paymentMethod: trimOrFallback(trimmedValue, defaults.paymentMethod),
-        },
-      };
-    }
-
-    return {
-      draft: {
-        ...current,
-        note: trimmedValue || undefined,
-      },
-    };
+    return { draft: parsed.draft };
   };
 
   const buildMovementDraftFromDraftRow = (
     row: SpreadsheetDraftRow,
   ): { draft: MovementDraft | null; errors: Partial<Record<SpreadsheetColumnKey, string>> } => {
-    const errors: Partial<Record<SpreadsheetColumnKey, string>> = {};
-    const amountCents = parseAmountToCents(row.amountInput);
-    if (amountCents === null || amountCents <= 0) {
-      errors.amount = 'Monto invalido. Usa un numero mayor a 0.';
-    }
-
-    if (!isValidIsoDate(row.date)) {
-      errors.date = 'Fecha invalida. Usa formato YYYY-MM-DD.';
-    }
-
-    if (!isMovementType(row.type)) {
-      errors.type = 'Tipo invalido.';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      return { draft: null, errors };
-    }
-
-    const defaults = {
-      category: categories[0] ?? 'Otros',
-      paymentMethod: paymentMethods[0] ?? 'Efectivo',
-    };
-
-    return {
-      draft: {
+    return buildMovementDraftFromLooseRow(
+      {
         type: row.type,
-        amountCents: amountCents!,
-        category: trimOrFallback(row.category, defaults.category),
+        amountInput: row.amountInput,
+        category: row.category,
         date: row.date,
-        paymentMethod: trimOrFallback(row.paymentMethod, defaults.paymentMethod),
-        note: row.note.trim() || undefined,
+        paymentMethod: row.paymentMethod,
+        note: row.note,
       },
-      errors,
-    };
+      {
+        defaultCategory: defaults.category,
+        defaultPaymentMethod: defaults.paymentMethod,
+      },
+    );
   };
 
   const commitDraftCell = (origin: SpreadsheetCellPosition, intent: SpreadsheetNavigationIntent) => {
@@ -462,9 +644,9 @@ export const SpreadsheetTable = ({
     if (origin.column === 'amount') {
       nextDraft.amountInput = sanitized;
     } else if (origin.column === 'date') {
-      nextDraft.date = sanitized;
-    } else if (origin.column === 'type' && isMovementType(sanitized)) {
-      nextDraft.type = sanitized;
+      nextDraft.date = normalizeFlexibleDateInput(sanitized) ?? sanitized;
+    } else if (origin.column === 'type') {
+      nextDraft.type = normalizeTypeInput(sanitized) ?? nextDraft.type;
     } else if (origin.column === 'category') {
       nextDraft.category = sanitized;
     } else if (origin.column === 'paymentMethod') {
@@ -608,10 +790,11 @@ export const SpreadsheetTable = ({
 
     setIsSavingDraft(true);
     try {
-      await onCreateMovement(parsed.draft);
+      const createdId = await onCreateMovement(parsed.draft);
       clearRowErrors(draftRow.key);
       setDraftRow(null);
       setActiveCell(null);
+      setPendingFocusMovementId(createdId);
       pushToast({
         tone: 'success',
         title: 'Fila creada',
@@ -651,6 +834,143 @@ export const SpreadsheetTable = ({
     return cellErrors[makeCellErrorKey(rowKey, column)];
   };
 
+  const handleDuplicateFromRow = async (movement: MovementRecord): Promise<number | null> => {
+    const duplicatedId = await onDuplicateMovement(movement);
+    if (duplicatedId) {
+      setPendingFocusMovementId(duplicatedId);
+    }
+    return duplicatedId;
+  };
+
+  const handleSpreadsheetPaste = async (event: ClipboardEvent<HTMLDivElement>) => {
+    if (!activeCell) {
+      return;
+    }
+
+    const clipboardText = event.clipboardData.getData('text/plain');
+    const matrix = parseClipboardMatrix(clipboardText);
+    if (matrix.length === 0) {
+      return;
+    }
+
+    if (matrix.length === 1 && matrix[0]?.length === 1) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const startColumnIndex = SPREADSHEET_COLUMNS.findIndex((column) => column === activeCell.column);
+    if (startColumnIndex < 0) {
+      return;
+    }
+
+    const activeMovementId = parseMovementIdFromRowKey(activeCell.rowKey);
+    let startMovementIndex =
+      activeMovementId === null
+        ? movements.length
+        : movements.findIndex((movement) => movement.id === activeMovementId);
+
+    if (startMovementIndex < 0) {
+      startMovementIndex = movements.length;
+    }
+
+    const updatedRowKeys: string[] = [];
+    const createdIds: number[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+    const errorSamples: string[] = [];
+
+    for (let rowOffset = 0; rowOffset < matrix.length; rowOffset += 1) {
+      const rowCells = matrix[rowOffset];
+      const targetMovement = movements[startMovementIndex + rowOffset];
+      let workingRow = targetMovement
+        ? buildLooseRowFromMovement(targetMovement)
+        : createLooseDefaultRow(categories, paymentMethods);
+
+      for (let columnOffset = 0; columnOffset < rowCells.length; columnOffset += 1) {
+        const targetColumnIndex = startColumnIndex + columnOffset;
+        if (targetColumnIndex >= SPREADSHEET_COLUMNS.length) {
+          break;
+        }
+
+        const targetColumn = SPREADSHEET_COLUMNS[targetColumnIndex];
+        workingRow = applyPasteValueToLooseRow(workingRow, targetColumn, rowCells[columnOffset] ?? '');
+      }
+
+      const parsed = buildMovementDraftFromLooseRow(workingRow, {
+        defaultCategory: defaults.category,
+        defaultPaymentMethod: defaults.paymentMethod,
+      });
+
+      if (!parsed.draft) {
+        errorCount += 1;
+        if (errorSamples.length < 3) {
+          const detail =
+            parsed.errors.amount ??
+            parsed.errors.date ??
+            parsed.errors.type ??
+            'Fila invalida.';
+          errorSamples.push(`Fila ${rowOffset + 1}: ${detail}`);
+        }
+        continue;
+      }
+
+      try {
+        if (targetMovement?.id !== undefined) {
+          await onUpdateMovement(targetMovement.id, parsed.draft);
+          updatedRowKeys.push(`m-${targetMovement.id}`);
+        } else {
+          const createdId = await onCreateMovement(parsed.draft);
+          createdIds.push(createdId);
+        }
+        successCount += 1;
+      } catch (error) {
+        errorCount += 1;
+        if (errorSamples.length < 3) {
+          errorSamples.push(
+            `Fila ${rowOffset + 1}: ${
+              error instanceof Error ? error.message : 'No se pudo guardar.'
+            }`,
+          );
+        }
+      }
+    }
+
+    if (successCount > 0) {
+      const uniqueUpdated = [...new Set(updatedRowKeys)];
+      if (uniqueUpdated.length > 0) {
+        setHighlightedRowKeys(uniqueUpdated);
+      }
+      if (createdIds.length > 0) {
+        setPendingFocusMovementId(createdIds[createdIds.length - 1]);
+      }
+    }
+
+    if (successCount === 0 && errorCount > 0) {
+      pushToast({
+        tone: 'error',
+        title: 'Pegado sin filas validas',
+        description: errorSamples.join(' | '),
+      });
+      return;
+    }
+
+    if (errorCount === 0) {
+      pushToast({
+        tone: 'success',
+        title: 'Pegado completado',
+        description: `Se aplicaron ${successCount} fila(s).`,
+      });
+      return;
+    }
+
+    pushToast({
+      tone: 'info',
+      title: 'Pegado parcial',
+      description: `${successCount} fila(s) aplicadas, ${errorCount} con error. ${errorSamples.join(' | ')}`,
+    });
+  };
+
   return (
     <section className="card spreadsheet-card">
       <header className="section-header history-header">
@@ -667,7 +987,7 @@ export const SpreadsheetTable = ({
 
       <div className="spreadsheet-toolbar">
         <p className="spreadsheet-help">
-          Enter guarda y baja. Tab avanza. Shift+Tab retrocede. Escape cancela.
+          Enter guarda y baja. Tab avanza. Shift+Tab retrocede. Escape cancela. Pega multiples filas con Ctrl+V.
         </p>
         <button type="button" className="button button-primary" onClick={handleAddDraftRow}>
           + Nueva fila
@@ -680,7 +1000,7 @@ export const SpreadsheetTable = ({
           description="Proba cambiando filtros o agrega una fila nueva para empezar."
         />
       ) : (
-        <div className="spreadsheet-scroll">
+        <div className="spreadsheet-scroll" onPaste={(event) => void handleSpreadsheetPaste(event)}>
           <table className="spreadsheet-table">
             <thead>
               <tr>
@@ -710,9 +1030,11 @@ export const SpreadsheetTable = ({
                   onCommitActiveCell={handleCommitActiveCell}
                   onCancelActiveCell={handleCancelActiveCell}
                   onDeleteRequest={onDeleteRequest}
+                  onDuplicateRequest={handleDuplicateFromRow}
                   onSaveDraft={handleSaveDraftRow}
                   onDiscardDraft={handleDiscardDraftRow}
                   isSavingDraft={isSavingDraft}
+                  isHighlighted={highlightedRowKeys.includes(row.key)}
                 />
               ))}
             </tbody>
