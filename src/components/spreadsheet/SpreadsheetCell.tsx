@@ -22,7 +22,12 @@ interface SpreadsheetCellProps {
 }
 
 const isSelectColumn = (column: SpreadsheetColumnKey): boolean => {
-  return column === 'type' || column === 'category' || column === 'paymentMethod';
+  return (
+    column === 'type' ||
+    column === 'category' ||
+    column === 'paymentMethod' ||
+    column === 'isPaymentReminder'
+  );
 };
 
 export const SpreadsheetCell = ({
@@ -186,7 +191,7 @@ export const SpreadsheetCell = ({
               inputRef.current = element;
             }}
             className={`sheet-editor field sheet-editor-${column}`}
-            type={column === 'date' ? 'date' : 'text'}
+            type={column === 'date' || column === 'dueDate' ? 'date' : 'text'}
             inputMode={column === 'amount' ? 'decimal' : 'text'}
             pattern={column === 'amount' ? '[0-9.,]*' : undefined}
             enterKeyHint="next"

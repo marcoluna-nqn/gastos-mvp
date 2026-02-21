@@ -35,6 +35,9 @@ const cloneMovementToDraft = (movement: MovementRecord): MovementDraft => ({
   amountCents: movement.amountCents,
   category: movement.category,
   date: todayIsoDate(),
+  dueDate: movement.dueDate,
+  isBill: movement.isBill ?? movement.isPaymentReminder,
+  isPaymentReminder: movement.isPaymentReminder ?? movement.isBill,
   paymentMethod: movement.paymentMethod,
   note: movement.note,
 });
@@ -63,8 +66,18 @@ export const MovementsPage = ({
   const [movementToDelete, setMovementToDelete] = useState<MovementRecord | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [budgetManagerOpen, setBudgetManagerOpen] = useState(false);
+  const [onlyDuePayments, setOnlyDuePayments] = useState(false);
 
-  const visibleMovements = useMemo(() => applySearchFilter(movements, search), [movements, search]);
+  const visibleMovements = useMemo(() => {
+    const searched = applySearchFilter(movements, search);
+    if (!onlyDuePayments) {
+      return searched;
+    }
+
+    return searched.filter(
+      (movement) => Boolean(movement.dueDate),
+    );
+  }, [movements, onlyDuePayments, search]);
 
   useEffect(() => {
     if (viewMode === 'sheet') {
@@ -181,6 +194,9 @@ export const MovementsPage = ({
         editingMovement={editingMovement}
         onSubmit={handleSubmit}
         onCancelEdit={() => setEditingMovement(null)}
+        onQuickCreateCategory={async (name) => {
+          await handleCreateCategory(name, 'both');
+        }}
       />
 
       <div className="movements-panel">
@@ -201,6 +217,14 @@ export const MovementsPage = ({
                 onClick={() => setBudgetManagerOpen(true)}
               >
                 Presupuestos
+              </button>
+              <button
+                type="button"
+                className={`button compact ${onlyDuePayments ? 'button-primary' : 'button-secondary'}`}
+                onClick={() => setOnlyDuePayments((current) => !current)}
+                aria-pressed={onlyDuePayments}
+              >
+                {onlyDuePayments ? 'Mostrando vencimientos' : 'Solo pagos/vencimientos'}
               </button>
               <div className="segmented-control view-mode-control" role="tablist" aria-label="Cambiar vista">
                 <button

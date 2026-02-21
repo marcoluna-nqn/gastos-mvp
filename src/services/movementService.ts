@@ -13,11 +13,36 @@ const sanitizeCategory = (value: string): string => {
   return trimmed ? trimmed : DEFAULT_CATEGORY_NAME;
 };
 
+const sanitizeDueDate = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : undefined;
+};
+
+const sanitizeReminderFlags = (
+  draft: Pick<MovementDraft, 'isBill' | 'isPaymentReminder'>,
+): { isBill: boolean; isPaymentReminder: boolean } => {
+  const reminder = Boolean(draft.isPaymentReminder ?? draft.isBill ?? false);
+  return {
+    isBill: reminder,
+    isPaymentReminder: reminder,
+  };
+};
+
 const buildRecord = (draft: MovementDraft): Omit<MovementRecord, 'id'> => {
   const timestamp = new Date().toISOString();
+  const dueDate = sanitizeDueDate(draft.dueDate);
+  const reminderFlags = sanitizeReminderFlags(draft);
+  const shouldRemind = Boolean(dueDate && reminderFlags.isPaymentReminder);
   return {
     ...draft,
     category: sanitizeCategory(draft.category),
+    dueDate,
+    isBill: shouldRemind,
+    isPaymentReminder: shouldRemind,
     note: sanitizeNote(draft.note),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -49,11 +74,17 @@ export const updateMovement = async (id: number, draft: MovementDraft): Promise<
   }
 
   const normalizedCategory = sanitizeCategory(draft.category);
+  const dueDate = sanitizeDueDate(draft.dueDate);
+  const reminderFlags = sanitizeReminderFlags(draft);
+  const shouldRemind = Boolean(dueDate && reminderFlags.isPaymentReminder);
   await ensureCategoryExists(normalizedCategory, draft.type);
 
   await db.movements.update(id, {
     ...draft,
     category: normalizedCategory,
+    dueDate,
+    isBill: shouldRemind,
+    isPaymentReminder: shouldRemind,
     note: sanitizeNote(draft.note),
     updatedAt: new Date().toISOString(),
   });
@@ -94,13 +125,22 @@ export const importMovements = async (
     }
 
     const now = new Date().toISOString();
-    const rows: Omit<MovementRecord, 'id'>[] = sanitized.map((item) => ({
-      ...item,
-      category: sanitizeCategory(item.category),
-      note: sanitizeNote(item.note),
-      createdAt: now,
-      updatedAt: now,
-    }));
+    const rows: Omit<MovementRecord, 'id'>[] = sanitized.map((item) => {
+      const dueDate = sanitizeDueDate(item.dueDate);
+      const reminderFlags = sanitizeReminderFlags(item);
+      const shouldRemind = Boolean(dueDate && reminderFlags.isPaymentReminder);
+
+      return {
+        ...item,
+        category: sanitizeCategory(item.category),
+        dueDate,
+        isBill: shouldRemind,
+        isPaymentReminder: shouldRemind,
+        note: sanitizeNote(item.note),
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
 
     await db.movements.bulkAdd(rows);
   });

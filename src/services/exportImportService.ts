@@ -2,7 +2,7 @@ import { formatAmountFromCents } from '../utils/currency';
 import { parseAmountToCents } from '../utils/math';
 import type { MovementDraft, MovementRecord, MovementType } from '../types/movement';
 
-const JSON_BACKUP_VERSION = 1;
+const JSON_BACKUP_VERSION = 2;
 
 type JsonMovement = {
   type: MovementType;
@@ -10,6 +10,9 @@ type JsonMovement = {
   amount?: number | string;
   category: string;
   date: string;
+  dueDate?: string;
+  isBill?: boolean | string | number;
+  isPaymentReminder?: boolean | string | number;
   paymentMethod: string;
   note?: string;
 };
@@ -20,6 +23,41 @@ const isMovementType = (value: unknown): value is MovementType => {
 
 const isIsoDate = (value: string): boolean => {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
+};
+
+const parseBooleanLike = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return true;
+    }
+    if (value === 0) {
+      return false;
+    }
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!normalized) {
+    return null;
+  }
+
+  if (['si', 's', 'yes', 'true', '1'].includes(normalized)) {
+    return true;
+  }
+
+  if (['no', 'n', 'false', '0'].includes(normalized)) {
+    return false;
+  }
+
+  return null;
 };
 
 const parseMovementLike = (value: unknown): MovementDraft | null => {
@@ -58,11 +96,26 @@ const parseMovementLike = (value: unknown): MovementDraft | null => {
     return null;
   }
 
+  const dueDate =
+    typeof candidate.dueDate === 'string' && candidate.dueDate.trim()
+      ? candidate.dueDate.trim()
+      : undefined;
+  if (dueDate && !isIsoDate(dueDate)) {
+    return null;
+  }
+
+  const paymentReminder = parseBooleanLike(candidate.isPaymentReminder);
+  const billFlag = parseBooleanLike(candidate.isBill);
+  const reminder = Boolean(paymentReminder ?? billFlag ?? false);
+
   return {
     type: candidate.type,
     amountCents,
     category: trimmedCategory,
     date: candidate.date,
+    dueDate,
+    isBill: reminder,
+    isPaymentReminder: reminder,
     paymentMethod: trimmedMethod,
     note: candidate.note?.trim() || undefined,
   };
@@ -80,6 +133,9 @@ export const exportAsJson = (movements: MovementRecord[]): string => {
         amount: Number((movement.amountCents / 100).toFixed(2)),
         category: movement.category,
         date: movement.date,
+        dueDate: movement.dueDate ?? null,
+        isBill: movement.isBill ?? movement.isPaymentReminder ?? false,
+        isPaymentReminder: movement.isPaymentReminder ?? movement.isBill ?? false,
         paymentMethod: movement.paymentMethod,
         note: movement.note ?? '',
       })),
@@ -95,7 +151,17 @@ const escapeCsv = (value: string): string => {
 };
 
 export const exportAsCsv = (movements: MovementRecord[]): string => {
-  const headers = ['id', 'tipo', 'monto', 'categoria', 'fecha', 'metodo_pago', 'nota'];
+  const headers = [
+    'id',
+    'tipo',
+    'monto',
+    'categoria',
+    'fecha',
+    'vencimiento',
+    'recordatorio_pago',
+    'metodo_pago',
+    'nota',
+  ];
   const rows = movements.map((item) =>
     [
       String(item.id ?? ''),
@@ -103,6 +169,8 @@ export const exportAsCsv = (movements: MovementRecord[]): string => {
       formatAmountFromCents(item.amountCents, { currency: false }),
       item.category,
       item.date,
+      item.dueDate ?? '',
+      item.isPaymentReminder || item.isBill ? 'si' : 'no',
       item.paymentMethod,
       item.note ?? '',
     ]

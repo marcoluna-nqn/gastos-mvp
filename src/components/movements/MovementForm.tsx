@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useMemo,
   useRef,
@@ -18,9 +18,16 @@ interface MovementFormProps {
   editingMovement: MovementRecord | null;
   onSubmit: (draft: MovementDraft) => Promise<void>;
   onCancelEdit: () => void;
+  onQuickCreateCategory?: (name: string) => Promise<void>;
 }
 
-type FieldName = 'amount' | 'category' | 'date' | 'paymentMethod';
+type FieldName =
+  | 'amount'
+  | 'category'
+  | 'date'
+  | 'dueDate'
+  | 'paymentMethod'
+  | 'quickCategory';
 type ErrorState = Partial<Record<FieldName, string>>;
 
 interface FormState {
@@ -28,12 +35,23 @@ interface FormState {
   amount: string;
   category: string;
   date: string;
+  dueDate: string;
+  isPaymentReminder: boolean;
   paymentMethod: string;
   note: string;
 }
 
 const QUICK_AMOUNTS_ARS = [1000, 5000, 10000] as const;
 const quickAmountFormatter = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
+
+const isIsoDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+const normalizeCategoryName = (value: string): string => value.trim().replace(/\s+/g, ' ');
+
+const hasCategory = (categories: string[], candidate: string): boolean => {
+  const normalizedCandidate = normalizeCategoryName(candidate).toLocaleLowerCase('es');
+  return categories.some((category) => category.toLocaleLowerCase('es') === normalizedCandidate);
+};
 
 const getDefaultCategory = (categories: string[]): string => categories[0] ?? 'Otros';
 const getDefaultPaymentMethod = (methods: string[]): string => methods[0] ?? 'Efectivo';
@@ -47,6 +65,8 @@ const getDefaultState = (
   amount: '',
   category: getDefaultCategory(categories),
   date: todayIsoDate(),
+  dueDate: '',
+  isPaymentReminder: false,
   paymentMethod: getDefaultPaymentMethod(methods),
   note: '',
 });
@@ -68,14 +88,19 @@ export const MovementForm = ({
   editingMovement,
   onSubmit,
   onCancelEdit,
+  onQuickCreateCategory,
 }: MovementFormProps) => {
   const [form, setForm] = useState<FormState>(() => getDefaultState(categories, paymentMethods));
   const [errors, setErrors] = useState<ErrorState>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [quickCategoryName, setQuickCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const categoryFieldRef = useRef<HTMLSelectElement>(null);
   const dateFieldRef = useRef<HTMLInputElement>(null);
+  const dueDateFieldRef = useRef<HTMLInputElement>(null);
+  const reminderFieldRef = useRef<HTMLInputElement>(null);
   const paymentFieldRef = useRef<HTMLSelectElement>(null);
   const noteFieldRef = useRef<HTMLTextAreaElement>(null);
   const previousEditingIdRef = useRef<number | null>(null);
@@ -104,10 +129,20 @@ export const MovementForm = ({
       amount: formatAmountFromCents(editingMovement.amountCents, { currency: false }),
       category: editingMovement.category,
       date: editingMovement.date,
+      dueDate: editingMovement.dueDate ?? '',
+      isPaymentReminder: Boolean(editingMovement.isPaymentReminder ?? editingMovement.isBill ?? false),
       paymentMethod: editingMovement.paymentMethod,
       note: editingMovement.note ?? '',
     });
-    setShowOptionalFields(true);
+    setShowOptionalFields(
+      Boolean(
+        editingMovement.note ||
+          editingMovement.dueDate ||
+          editingMovement.isPaymentReminder ||
+          editingMovement.isBill,
+      ),
+    );
+    setQuickCategoryName('');
     setErrors({});
 
     requestAnimationFrame(() => {
@@ -132,6 +167,7 @@ export const MovementForm = ({
         ? current.paymentMethod
         : defaultPaymentMethod,
     }));
+    setQuickCategoryName('');
     setErrors({});
     setShowOptionalFields(false);
 
@@ -182,8 +218,16 @@ export const MovementForm = ({
       nextErrors.category = 'La categoria es obligatoria.';
     }
 
-    if (!form.date || !/^\d{4}-\d{2}-\d{2}$/.test(form.date)) {
+    if (!form.date || !isIsoDate(form.date)) {
       nextErrors.date = 'La fecha es obligatoria.';
+    }
+
+    if (form.dueDate && !isIsoDate(form.dueDate)) {
+      nextErrors.dueDate = 'La fecha de vencimiento no es valida.';
+    }
+
+    if (form.isPaymentReminder && !form.dueDate) {
+      nextErrors.dueDate = 'Para activar recordatorio agrega vencimiento.';
     }
 
     if (!form.paymentMethod.trim()) {
@@ -191,6 +235,17 @@ export const MovementForm = ({
     }
 
     return nextErrors;
+  };
+
+  const focusElement = (element: HTMLElement | null) => {
+    if (!element) {
+      return;
+    }
+
+    element.focus({ preventScroll: true });
+    if (element instanceof HTMLInputElement && element.type === 'text') {
+      element.select();
+    }
   };
 
   const focusFirstInvalidField = (nextErrors: ErrorState) => {
@@ -209,11 +264,24 @@ export const MovementForm = ({
       return;
     }
 
+    if (nextErrors.dueDate) {
+      setShowOptionalFields(true);
+      requestAnimationFrame(() => {
+        focusElement(dueDateFieldRef.current);
+      });
+      return;
+    }
+
     if (nextErrors.paymentMethod) {
       setShowOptionalFields(true);
       requestAnimationFrame(() => {
         focusElement(paymentFieldRef.current);
       });
+      return;
+    }
+
+    if (nextErrors.quickCategory) {
+      setShowOptionalFields(true);
     }
   };
 
@@ -232,17 +300,6 @@ export const MovementForm = ({
     const parsed = parseAmountToCents(form.amount);
     if (parsed !== null) {
       setField('amount', formatAmountFromCents(parsed, { currency: false }));
-    }
-  };
-
-  const focusElement = (element: HTMLElement | null) => {
-    if (!element) {
-      return;
-    }
-
-    element.focus({ preventScroll: true });
-    if (element instanceof HTMLInputElement && element.type === 'text') {
-      element.select();
     }
   };
 
@@ -284,6 +341,9 @@ export const MovementForm = ({
         amountCents: parsedAmount,
         category: form.category.trim(),
         date: form.date,
+        dueDate: form.dueDate || undefined,
+        isBill: form.isPaymentReminder,
+        isPaymentReminder: form.isPaymentReminder,
         paymentMethod: form.paymentMethod.trim(),
         note: form.note.trim() || undefined,
       });
@@ -294,6 +354,8 @@ export const MovementForm = ({
           amount: '',
           note: '',
           date: todayIsoDate(),
+          dueDate: '',
+          isPaymentReminder: false,
           category: categoryOptions.includes(current.category) ? current.category : defaultCategory,
           paymentMethod: paymentMethods.includes(current.paymentMethod)
             ? current.paymentMethod
@@ -302,6 +364,7 @@ export const MovementForm = ({
         setShowOptionalFields(false);
       }
 
+      setQuickCategoryName('');
       setErrors({});
       requestAnimationFrame(() => {
         focusAmountInput(amountInputRef.current, true);
@@ -322,6 +385,7 @@ export const MovementForm = ({
   const handleCancelEdit = () => {
     previousEditingIdRef.current = null;
     setForm((current) => getDefaultState(categories, paymentMethods, current.type));
+    setQuickCategoryName('');
     setErrors({});
     setShowOptionalFields(false);
     onCancelEdit();
@@ -335,11 +399,48 @@ export const MovementForm = ({
       const next = !current;
       if (next) {
         requestAnimationFrame(() => {
-          focusElement(paymentFieldRef.current);
+          focusElement(dueDateFieldRef.current);
         });
       }
       return next;
     });
+  };
+
+  const handleQuickCategoryCreate = async () => {
+    if (!onQuickCreateCategory || isCreatingCategory) {
+      return;
+    }
+
+    const normalizedName = normalizeCategoryName(quickCategoryName);
+    if (!normalizedName) {
+      setErrors((current) => ({
+        ...current,
+        quickCategory: 'Escribe un nombre para crear categoria.',
+      }));
+      return;
+    }
+
+    if (hasCategory(categoryOptions, normalizedName)) {
+      setField('category', normalizedName);
+      setQuickCategoryName('');
+      setErrors((current) => ({ ...current, quickCategory: undefined }));
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    try {
+      await onQuickCreateCategory(normalizedName);
+      setField('category', normalizedName);
+      setQuickCategoryName('');
+      setErrors((current) => ({ ...current, quickCategory: undefined }));
+    } catch (error) {
+      setErrors((current) => ({
+        ...current,
+        quickCategory: error instanceof Error ? error.message : 'No se pudo crear la categoria.',
+      }));
+    } finally {
+      setIsCreatingCategory(false);
+    }
   };
 
   return (
@@ -423,7 +524,7 @@ export const MovementForm = ({
               onKeyDown={(event) =>
                 handleAdvanceOnEnter(
                   event,
-                  showOptionalFields ? paymentFieldRef.current : amountInputRef.current,
+                  showOptionalFields ? dueDateFieldRef.current : amountInputRef.current,
                 )
               }
               aria-invalid={Boolean(errors.date)}
@@ -432,17 +533,89 @@ export const MovementForm = ({
           </label>
         </div>
 
+        {onQuickCreateCategory ? (
+          <div className="quick-category-row">
+            <input
+              className={`field ${errors.quickCategory ? 'field-error' : ''}`}
+              type="text"
+              value={quickCategoryName}
+              onChange={(event) => {
+                setQuickCategoryName(event.target.value);
+                if (errors.quickCategory) {
+                  setErrors((current) => ({ ...current, quickCategory: undefined }));
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') {
+                  return;
+                }
+                event.preventDefault();
+                void handleQuickCategoryCreate();
+              }}
+              placeholder="Nueva categoria (ej. Inversion)"
+              aria-label="Crear categoria rapida"
+            />
+            <button
+              type="button"
+              className="button button-secondary compact"
+              disabled={isCreatingCategory}
+              onClick={() => {
+                void handleQuickCategoryCreate();
+              }}
+            >
+              {isCreatingCategory ? 'Agregando...' : '+ Categoria'}
+            </button>
+          </div>
+        ) : null}
+        {errors.quickCategory ? <small className="error-text">{errors.quickCategory}</small> : null}
+
         <button
           type="button"
           className="text-button optional-toggle"
           onClick={toggleOptionalFields}
           aria-expanded={showOptionalFields}
         >
-          {showOptionalFields ? 'Ocultar detalles opcionales' : 'Agregar metodo de pago y nota'}
+          {showOptionalFields ? 'Ocultar detalles opcionales' : 'Agregar vencimiento, metodo y nota'}
         </button>
 
         {showOptionalFields ? (
           <div className="optional-fields">
+            <div className="form-grid optional-grid">
+              <label className="form-field">
+                <span>Vencimiento (opcional)</span>
+                <input
+                  ref={dueDateFieldRef}
+                  className={`field ${errors.dueDate ? 'field-error' : ''}`}
+                  type="date"
+                  enterKeyHint="next"
+                  value={form.dueDate}
+                  onChange={(event) => setField('dueDate', event.target.value)}
+                  onKeyDown={(event) => handleAdvanceOnEnter(event, reminderFieldRef.current)}
+                  aria-invalid={Boolean(errors.dueDate)}
+                />
+                {errors.dueDate ? <small className="error-text">{errors.dueDate}</small> : null}
+              </label>
+
+              <div className="form-field reminder-toggle-field">
+                <span>Pago con recordatorio</span>
+                <label className="reminder-toggle">
+                  <input
+                    ref={reminderFieldRef}
+                    type="checkbox"
+                    checked={form.isPaymentReminder}
+                    onChange={(event) => setField('isPaymentReminder', event.target.checked)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        focusElement(paymentFieldRef.current);
+                      }
+                    }}
+                  />
+                  <span>Recordarme este pago</span>
+                </label>
+              </div>
+            </div>
+
             <label className="form-field">
               <span>Metodo de pago</span>
               <select

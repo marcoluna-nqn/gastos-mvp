@@ -84,6 +84,26 @@ class GastosDatabase extends Dexie {
       budgets: '++id, &[monthKey+categoryId], monthKey, categoryId, updatedAt, createdAt',
       savingsGoals: '++id, &monthKey, monthKey, updatedAt, createdAt',
     });
+
+    this.version(5)
+      .stores({
+        movements:
+          '++id, type, category, date, dueDate, isPaymentReminder, paymentMethod, amountCents, createdAt',
+        categories: '++id, &nameLower, name, type, isDefault, createdAt, updatedAt',
+        budgets: '++id, &[monthKey+categoryId], monthKey, categoryId, updatedAt, createdAt',
+        savingsGoals: '++id, &monthKey, monthKey, updatedAt, createdAt',
+      })
+      .upgrade(async (tx) => {
+        const movementsTable = tx.table('movements') as Table<MovementRecord, number>;
+        await movementsTable.toCollection().modify((movement) => {
+          if (movement.isPaymentReminder === undefined && movement.isBill !== undefined) {
+            movement.isPaymentReminder = Boolean(movement.isBill);
+          }
+          if (movement.isBill === undefined && movement.isPaymentReminder !== undefined) {
+            movement.isBill = Boolean(movement.isPaymentReminder);
+          }
+        });
+      });
   }
 }
 

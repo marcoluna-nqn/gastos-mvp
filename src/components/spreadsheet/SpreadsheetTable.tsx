@@ -33,6 +33,8 @@ interface LooseRowInput {
   amountInput: string;
   category: string;
   date: string;
+  dueDate: string;
+  isPaymentReminder: string;
   paymentMethod: string;
   note: string;
 }
@@ -43,6 +45,8 @@ const SPREADSHEET_COLUMNS: SpreadsheetColumnKey[] = [
   'category',
   'paymentMethod',
   'amount',
+  'dueDate',
+  'isPaymentReminder',
   'note',
 ];
 
@@ -52,6 +56,8 @@ const COLUMN_HEADERS: Record<SpreadsheetColumnKey, string> = {
   category: 'Categoria',
   paymentMethod: 'Metodo de pago',
   amount: 'Monto',
+  dueDate: 'Vencimiento',
+  isPaymentReminder: 'Recordatorio',
   note: 'Nota',
 };
 
@@ -145,6 +151,39 @@ const normalizeTypeInput = (value: string): MovementType | null => {
   return null;
 };
 
+const normalizeReminderInput = (value: string): string => {
+  const normalized = value
+    .trim()
+    .toLocaleLowerCase('es')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (!normalized) {
+    return 'no';
+  }
+
+  if (
+    normalized === 'si' ||
+    normalized === 's' ||
+    normalized === '1' ||
+    normalized === 'true' ||
+    normalized === 'yes'
+  ) {
+    return 'si';
+  }
+
+  if (
+    normalized === 'no' ||
+    normalized === 'n' ||
+    normalized === '0' ||
+    normalized === 'false'
+  ) {
+    return 'no';
+  }
+
+  return normalized;
+};
+
 const parseClipboardMatrix = (rawText: string): string[][] => {
   const normalized = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const rows = normalized.split('\n');
@@ -181,6 +220,9 @@ const buildMovementDraftFromRecord = (movement: MovementRecord): MovementDraft =
   amountCents: movement.amountCents,
   category: movement.category,
   date: movement.date,
+  dueDate: movement.dueDate,
+  isBill: movement.isBill ?? movement.isPaymentReminder,
+  isPaymentReminder: movement.isPaymentReminder ?? movement.isBill,
   paymentMethod: movement.paymentMethod,
   note: movement.note,
 });
@@ -190,6 +232,8 @@ const buildLooseRowFromMovement = (movement: MovementRecord): LooseRowInput => (
   amountInput: formatAmountFromCents(movement.amountCents, { currency: false }),
   category: movement.category,
   date: movement.date,
+  dueDate: movement.dueDate ?? '',
+  isPaymentReminder: movement.isPaymentReminder || movement.isBill ? 'si' : 'no',
   paymentMethod: movement.paymentMethod,
   note: movement.note ?? '',
 });
@@ -199,6 +243,8 @@ const createLooseDefaultRow = (categories: string[], paymentMethods: string[]): 
   amountInput: '',
   category: categories[0] ?? DEFAULT_CATEGORY_NAME,
   date: todayIsoDate(),
+  dueDate: '',
+  isPaymentReminder: 'no',
   paymentMethod: paymentMethods[0] ?? 'Efectivo',
   note: '',
 });
@@ -209,6 +255,8 @@ const createDraftRow = (categories: string[], paymentMethods: string[]): Spreads
   amountInput: '',
   category: categories[0] ?? DEFAULT_CATEGORY_NAME,
   date: todayIsoDate(),
+  dueDate: '',
+  isPaymentReminder: 'no',
   paymentMethod: paymentMethods[0] ?? 'Efectivo',
   note: '',
 });
@@ -221,6 +269,10 @@ const isSameCell = (left: SpreadsheetCellPosition | null, right: SpreadsheetCell
 const sanitizeCellInput = (column: SpreadsheetColumnKey, value: string): string => {
   if (column === 'amount') {
     return normalizeAmountInput(value);
+  }
+
+  if (column === 'isPaymentReminder') {
+    return normalizeReminderInput(value);
   }
 
   return value;
@@ -252,6 +304,22 @@ const buildMovementDraftFromLooseRow = (
     errors.amount = 'Monto invalido. Usa un numero mayor a 0.';
   }
 
+  const normalizedReminder = normalizeReminderInput(row.isPaymentReminder);
+  if (normalizedReminder !== 'si' && normalizedReminder !== 'no') {
+    errors.isPaymentReminder = 'Usa Si o No.';
+  }
+
+  const reminderFlag = normalizedReminder === 'si';
+  const dueDateValue = row.dueDate.trim();
+  const normalizedDueDate = dueDateValue ? normalizeFlexibleDateInput(dueDateValue) : null;
+  if (dueDateValue && !normalizedDueDate) {
+    errors.dueDate = 'Vencimiento invalido.';
+  }
+
+  if (reminderFlag && !normalizedDueDate) {
+    errors.dueDate = 'Agrega vencimiento para recordatorio.';
+  }
+
   if (Object.keys(errors).length > 0) {
     return { draft: null, errors };
   }
@@ -262,6 +330,9 @@ const buildMovementDraftFromLooseRow = (
       amountCents: amountCents!,
       category: trimOrFallback(row.category, options.defaultCategory),
       date: normalizedDate!,
+      dueDate: normalizedDueDate ?? undefined,
+      isBill: reminderFlag,
+      isPaymentReminder: reminderFlag,
       paymentMethod: trimOrFallback(row.paymentMethod, options.defaultPaymentMethod),
       note: row.note.trim() || undefined,
     },
@@ -287,8 +358,18 @@ const applyPasteValueToLooseRow = (
     return next;
   }
 
+  if (column === 'dueDate') {
+    next.dueDate = normalizeFlexibleDateInput(value) ?? trimmed;
+    return next;
+  }
+
   if (column === 'type') {
     next.type = normalizeTypeInput(value) ?? trimmed;
+    return next;
+  }
+
+  if (column === 'isPaymentReminder') {
+    next.isPaymentReminder = normalizeReminderInput(value);
     return next;
   }
 
@@ -465,6 +546,8 @@ export const SpreadsheetTable = ({
           date: draft.date,
           type: draft.type,
           category: draft.category,
+          dueDate: draft.dueDate,
+          isPaymentReminder: draft.isPaymentReminder,
           paymentMethod: draft.paymentMethod,
           note: draft.note,
         }[column] ?? ''
@@ -485,6 +568,8 @@ export const SpreadsheetTable = ({
         date: movement.date,
         type: movement.type,
         category: movement.category,
+        dueDate: movement.dueDate ?? '',
+        isPaymentReminder: movement.isPaymentReminder || movement.isBill ? 'si' : 'no',
         paymentMethod: movement.paymentMethod,
         note: movement.note ?? '',
       }[column] ?? ''
@@ -513,6 +598,15 @@ export const SpreadsheetTable = ({
         return normalizedDate ? formatDisplayDate(normalizedDate) : rawValue;
       }
 
+      if (column === 'dueDate') {
+        const normalizedDueDate = normalizeFlexibleDateInput(rawValue);
+        return normalizedDueDate ? formatDisplayDate(normalizedDueDate) : rawValue;
+      }
+
+      if (column === 'isPaymentReminder') {
+        return normalizeReminderInput(rawValue) === 'si' ? 'Si' : 'No';
+      }
+
       return rawValue;
     }
 
@@ -537,6 +631,8 @@ export const SpreadsheetTable = ({
     return (
       {
         category: movement.category,
+        dueDate: movement.dueDate ? formatDisplayDate(movement.dueDate) : '-',
+        isPaymentReminder: movement.isPaymentReminder || movement.isBill ? 'Si' : 'No',
         paymentMethod: movement.paymentMethod,
         note: movement.note ?? '',
       }[column] ?? ''
@@ -626,6 +722,8 @@ export const SpreadsheetTable = ({
         amountInput: row.amountInput,
         category: row.category,
         date: row.date,
+        dueDate: row.dueDate,
+        isPaymentReminder: row.isPaymentReminder,
         paymentMethod: row.paymentMethod,
         note: row.note,
       },
@@ -648,8 +746,12 @@ export const SpreadsheetTable = ({
       nextDraft.amountInput = sanitized;
     } else if (origin.column === 'date') {
       nextDraft.date = normalizeFlexibleDateInput(sanitized) ?? sanitized;
+    } else if (origin.column === 'dueDate') {
+      nextDraft.dueDate = normalizeFlexibleDateInput(sanitized) ?? sanitized;
     } else if (origin.column === 'type') {
       nextDraft.type = normalizeTypeInput(sanitized) ?? nextDraft.type;
+    } else if (origin.column === 'isPaymentReminder') {
+      nextDraft.isPaymentReminder = normalizeReminderInput(sanitized);
     } else if (origin.column === 'category') {
       nextDraft.category = sanitized;
     } else if (origin.column === 'paymentMethod') {
@@ -695,6 +797,9 @@ export const SpreadsheetTable = ({
       current.amountCents === parsed.draft.amountCents &&
       current.category === parsed.draft.category &&
       current.date === parsed.draft.date &&
+      (current.dueDate ?? '') === (parsed.draft.dueDate ?? '') &&
+      Boolean(current.isPaymentReminder ?? current.isBill ?? false) ===
+        Boolean(parsed.draft.isPaymentReminder ?? parsed.draft.isBill ?? false) &&
       current.paymentMethod === parsed.draft.paymentMethod &&
       (current.note ?? '') === (parsed.draft.note ?? '');
 
@@ -831,6 +936,13 @@ export const SpreadsheetTable = ({
       return paymentMethods.map((method) => ({ value: method, label: method }));
     }
 
+    if (column === 'isPaymentReminder') {
+      return [
+        { value: 'si', label: 'Si' },
+        { value: 'no', label: 'No' },
+      ];
+    }
+
     return undefined;
   };
 
@@ -912,6 +1024,8 @@ export const SpreadsheetTable = ({
           const detail =
             parsed.errors.amount ??
             parsed.errors.date ??
+            parsed.errors.dueDate ??
+            parsed.errors.isPaymentReminder ??
             parsed.errors.type ??
             'Fila invalida.';
           errorSamples.push(`Fila ${rowOffset + 1}: ${detail}`);
@@ -984,14 +1098,14 @@ export const SpreadsheetTable = ({
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar categoria, nota o fecha"
+          placeholder="Buscar categoria, fecha, nota o vencimiento"
           aria-label="Buscar movimientos en planilla"
         />
       </header>
 
       <div className="spreadsheet-toolbar">
         <p className="spreadsheet-help">
-          Enter guarda y baja. Tab avanza. Shift+Tab retrocede. Escape cancela. Pegado multiple con Ctrl+V.
+          Enter guarda y baja. Tab avanza. Shift+Tab retrocede. Escape cancela. Soporta vencimiento y recordatorio.
         </p>
         <button type="button" className="button button-primary" onClick={handleAddDraftRow}>
           + Nueva fila

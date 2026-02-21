@@ -33,7 +33,10 @@ export const applySearchFilter = (movements: MovementRecord[], search: string): 
       movement.category.toLowerCase().includes(normalized) ||
       movement.paymentMethod.toLowerCase().includes(normalized) ||
       movement.note?.toLowerCase().includes(normalized) ||
-      movement.date.includes(normalized)
+      movement.date.includes(normalized) ||
+      movement.dueDate?.includes(normalized) ||
+      ((movement.isPaymentReminder || movement.isBill) &&
+        ('recordatorio pago vencimiento'.includes(normalized) || normalized === 'pago'))
     );
   });
 };

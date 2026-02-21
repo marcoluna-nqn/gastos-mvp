@@ -48,6 +48,8 @@ export const exportAsExcel = async (
     { header: 'Fecha', key: 'date', width: 13 },
     { header: 'Tipo', key: 'type', width: 12 },
     { header: 'Categoria', key: 'category', width: 22 },
+    { header: 'Vencimiento', key: 'dueDate', width: 14 },
+    { header: 'Recordatorio', key: 'reminder', width: 13 },
     { header: 'Metodo de pago', key: 'paymentMethod', width: 22 },
     { header: 'Monto', key: 'amount', width: 15 },
     { header: 'Nota', key: 'note', width: 42 },
@@ -65,7 +67,7 @@ export const exportAsExcel = async (
 
   movementSheet.autoFilter = {
     from: 'A1',
-    to: 'F1',
+    to: 'H1',
   };
 
   for (const movement of movements) {
@@ -73,14 +75,19 @@ export const exportAsExcel = async (
       date: toExcelDate(movement.date),
       type: movement.type === 'ingreso' ? 'Ingreso' : 'Gasto',
       category: movement.category,
+      dueDate: movement.dueDate ? toExcelDate(movement.dueDate) : '',
+      reminder: movement.isPaymentReminder || movement.isBill ? 'Si' : 'No',
       paymentMethod: movement.paymentMethod,
       amount: movement.type === 'ingreso' ? movement.amountCents / 100 : -(movement.amountCents / 100),
       note: movement.note ?? '',
     });
 
     row.getCell('A').numFmt = 'dd/mm/yyyy';
-    row.getCell('E').numFmt = '"ARS" #,##0.00;[Red]-"ARS" #,##0.00';
-    row.getCell('F').alignment = { wrapText: true, vertical: 'top' };
+    if (movement.dueDate) {
+      row.getCell('D').numFmt = 'dd/mm/yyyy';
+    }
+    row.getCell('G').numFmt = '"ARS" #,##0.00;[Red]-"ARS" #,##0.00';
+    row.getCell('H').alignment = { wrapText: true, vertical: 'top' };
   }
 
   movementSheet.eachRow((row, rowNumber) => {

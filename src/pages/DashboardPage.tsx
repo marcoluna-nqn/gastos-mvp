@@ -4,6 +4,7 @@ import { CategoryDoughnutChart } from '../components/dashboard/CategoryDoughnutC
 import { MonthlyTrendChart } from '../components/dashboard/MonthlyTrendChart';
 import { ProjectionCard } from '../components/dashboard/ProjectionCard';
 import { SummaryCards } from '../components/dashboard/SummaryCards';
+import { UpcomingDuePaymentsCard } from '../components/dashboard/UpcomingDuePaymentsCard';
 import { SavingsGoalModal } from '../components/goals/SavingsGoalModal';
 import type { BudgetRecord } from '../types/budget';
 import type { CategoryRecord } from '../types/category';
@@ -83,6 +84,7 @@ export const DashboardPage = ({
           </p>
         </section>
         <SummaryCards totals={totals} />
+        <UpcomingDuePaymentsCard movements={allMovements} />
         <button
           type="button"
           className="button button-secondary dashboard-advanced-toggle"

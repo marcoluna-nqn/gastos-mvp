@@ -7,6 +7,9 @@ export interface MovementRecord {
   amountCents: number;
   category: string;
   date: string;
+  dueDate?: string;
+  isBill?: boolean;
+  isPaymentReminder?: boolean;
   paymentMethod: string;
   note?: string;
   createdAt: string;
@@ -18,6 +21,9 @@ export interface MovementDraft {
   amountCents: number;
   category: string;
   date: string;
+  dueDate?: string;
+  isBill?: boolean;
+  isPaymentReminder?: boolean;
   paymentMethod: string;
   note?: string;
 }
