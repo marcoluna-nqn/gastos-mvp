@@ -1,22 +1,66 @@
 const normalizeNumberInput = (value: string): string => {
-  const trimmed = value.trim().replace(/\s+/g, '');
+  const cleaned = value
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^\d,.-]/g, '');
 
-  if (trimmed.includes(',') && trimmed.includes('.')) {
-    const commaPosition = trimmed.lastIndexOf(',');
-    const dotPosition = trimmed.lastIndexOf('.');
+  if (!cleaned) {
+    return '';
+  }
+
+  if (cleaned.includes('-')) {
+    return cleaned;
+  }
+
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    const commaPosition = cleaned.lastIndexOf(',');
+    const dotPosition = cleaned.lastIndexOf('.');
 
     if (commaPosition > dotPosition) {
-      return trimmed.replaceAll('.', '').replace(',', '.');
+      return cleaned.replaceAll('.', '').replace(',', '.');
     }
 
-    return trimmed.replaceAll(',', '');
+    return cleaned.replaceAll(',', '');
   }
 
-  if (trimmed.includes(',')) {
-    return trimmed.replace(',', '.');
+  if (cleaned.includes(',')) {
+    const parts = cleaned.split(',');
+    if (parts.length > 2) {
+      const decimal = parts.pop() ?? '';
+      const integer = parts.join('');
+      return decimal.length <= 2 ? `${integer}.${decimal}` : `${integer}${decimal}`;
+    }
+
+    const decimal = parts[1] ?? '';
+    if (decimal.length === 3) {
+      return cleaned.replace(',', '');
+    }
+
+    return cleaned.replace(',', '.');
   }
 
-  return trimmed;
+  if (cleaned.includes('.')) {
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      const decimal = parts.pop() ?? '';
+      const integer = parts.join('');
+      return decimal.length <= 2 ? `${integer}.${decimal}` : `${integer}${decimal}`;
+    }
+
+    const decimal = parts[1] ?? '';
+    if (decimal.length === 3) {
+      return cleaned.replace('.', '');
+    }
+  }
+
+  return cleaned;
+};
+
+export const normalizeAmountInput = (value: string): string => {
+  return value
+    .replace(/[^\d.,]/g, '')
+    .replace(/^0+(?=\d)/, '0')
+    .slice(0, 18);
 };
 
 export const parseAmountToCents = (value: string): number | null => {
