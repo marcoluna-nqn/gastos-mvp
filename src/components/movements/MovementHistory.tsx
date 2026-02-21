@@ -23,13 +23,13 @@ export const MovementHistory = ({
   return (
     <section className="card">
       <header className="section-header history-header">
-        <h2>Historial</h2>
+        <h2>Lista</h2>
         <input
           className="field search-field"
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por categoria, nota o fecha"
+          placeholder="Buscar categoria, nota o fecha"
           aria-label="Buscar movimientos"
         />
       </header>

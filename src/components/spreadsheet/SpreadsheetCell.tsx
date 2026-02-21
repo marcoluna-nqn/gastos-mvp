@@ -154,11 +154,12 @@ export const SpreadsheetCell = ({
             ref={(element) => {
               inputRef.current = element;
             }}
-            className="sheet-editor field"
+            className={`sheet-editor field sheet-editor-${column}`}
             value={editValue}
             onChange={(event) => onChange(event.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleEditingKeyDown}
+            aria-invalid={Boolean(error)}
           >
             {options?.map((option) => (
               <option key={option.value} value={option.value}>
@@ -171,21 +172,23 @@ export const SpreadsheetCell = ({
             ref={(element) => {
               inputRef.current = element;
             }}
-            className="sheet-editor field"
+            className={`sheet-editor field sheet-editor-${column}`}
             rows={2}
             value={editValue}
             onChange={(event) => onChange(event.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleEditingKeyDown}
+            aria-invalid={Boolean(error)}
           />
         ) : (
           <input
             ref={(element) => {
               inputRef.current = element;
             }}
-            className="sheet-editor field"
+            className={`sheet-editor field sheet-editor-${column}`}
             type={column === 'date' ? 'date' : 'text'}
             inputMode={column === 'amount' ? 'decimal' : 'text'}
+            pattern={column === 'amount' ? '[0-9.,]*' : undefined}
             enterKeyHint="next"
             value={editValue}
             onChange={(event) => onChange(event.target.value)}
@@ -196,10 +199,16 @@ export const SpreadsheetCell = ({
               }
             }}
             onKeyDown={handleEditingKeyDown}
+            aria-invalid={Boolean(error)}
           />
         )
       ) : (
-        <button type="button" className="sheet-display" onClick={onActivate} onKeyDown={handleDisplayKeyDown}>
+        <button
+          type="button"
+          className={`sheet-display sheet-display-${column}`}
+          onClick={onActivate}
+          onKeyDown={handleDisplayKeyDown}
+        >
           {textForDisplay}
         </button>
       )}

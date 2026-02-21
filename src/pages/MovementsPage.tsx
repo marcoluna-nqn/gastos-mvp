@@ -193,7 +193,7 @@ export const MovementsPage = ({
                 className="button button-secondary compact"
                 onClick={() => setCategoryManagerOpen(true)}
               >
-                Gestionar categorias
+                Categorias
               </button>
               <button
                 type="button"
@@ -208,14 +208,14 @@ export const MovementsPage = ({
                   className={`segmented-option ${viewMode === 'list' ? 'is-active' : ''}`}
                   onClick={() => setViewMode('list')}
                 >
-                  Vista lista
+                  Lista
                 </button>
                 <button
                   type="button"
                   className={`segmented-option ${viewMode === 'sheet' ? 'is-active' : ''}`}
                   onClick={() => setViewMode('sheet')}
                 >
-                  Vista planilla
+                  Planilla
                 </button>
               </div>
             </div>

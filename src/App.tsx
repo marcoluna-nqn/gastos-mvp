@@ -12,7 +12,7 @@ import { BackupPage } from './pages/BackupPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MovementsPage } from './pages/MovementsPage';
 import type { MovementFilters } from './types/movement';
-import { toMonthKey } from './utils/date';
+import { currentMonthKey, toMonthKey } from './utils/date';
 import { applyMovementFilters } from './utils/filters';
 
 const buildUniqueSorted = (items: string[]): string[] => {
@@ -24,7 +24,10 @@ const buildMonths = (items: string[]): string[] => {
 };
 
 function App() {
-  const [filters, setFilters] = useState<MovementFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<MovementFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    month: currentMonthKey(),
+  }));
   const { theme, toggleTheme } = useTheme();
   const {
     categories: categoryRecords,
@@ -58,19 +61,28 @@ function App() {
   }, [movements]);
 
   const months = useMemo(() => {
-    return buildMonths(movements.map((entry) => toMonthKey(entry.date)));
+    return buildMonths([currentMonthKey(), ...movements.map((entry) => toMonthKey(entry.date))]);
   }, [movements]);
 
   const normalizedFilters = useMemo(() => {
-    if (filters.category === 'all' || categories.includes(filters.category)) {
-      return filters;
+    let nextFilters = filters;
+
+    if (filters.category !== 'all' && !categories.includes(filters.category)) {
+      nextFilters = {
+        ...nextFilters,
+        category: 'all',
+      };
     }
 
-    return {
-      ...filters,
-      category: 'all',
-    };
-  }, [categories, filters]);
+    if (filters.month !== 'all' && !months.includes(filters.month)) {
+      nextFilters = {
+        ...nextFilters,
+        month: currentMonthKey(),
+      };
+    }
+
+    return nextFilters;
+  }, [categories, filters, months]);
 
   const filteredMovements = useMemo(
     () => applyMovementFilters(movements, normalizedFilters),

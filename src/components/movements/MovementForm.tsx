@@ -35,12 +35,19 @@ interface FormState {
 const QUICK_AMOUNTS_ARS = [1000, 5000, 10000] as const;
 const quickAmountFormatter = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
 
-const getDefaultState = (categories: string[], methods: string[]): FormState => ({
-  type: 'gasto',
+const getDefaultCategory = (categories: string[]): string => categories[0] ?? 'Otros';
+const getDefaultPaymentMethod = (methods: string[]): string => methods[0] ?? 'Efectivo';
+
+const getDefaultState = (
+  categories: string[],
+  methods: string[],
+  type: MovementType = 'gasto',
+): FormState => ({
+  type,
   amount: '',
-  category: categories[0] ?? 'Otros',
+  category: getDefaultCategory(categories),
   date: todayIsoDate(),
-  paymentMethod: methods[0] ?? 'Efectivo',
+  paymentMethod: getDefaultPaymentMethod(methods),
   note: '',
 });
 
@@ -62,15 +69,25 @@ export const MovementForm = ({
   onSubmit,
   onCancelEdit,
 }: MovementFormProps) => {
-  const defaults = useMemo(() => getDefaultState(categories, paymentMethods), [categories, paymentMethods]);
-  const [form, setForm] = useState<FormState>(defaults);
+  const [form, setForm] = useState<FormState>(() => getDefaultState(categories, paymentMethods));
   const [errors, setErrors] = useState<ErrorState>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const categoryFieldRef = useRef<HTMLSelectElement>(null);
   const dateFieldRef = useRef<HTMLInputElement>(null);
   const paymentFieldRef = useRef<HTMLSelectElement>(null);
   const noteFieldRef = useRef<HTMLTextAreaElement>(null);
+  const previousEditingIdRef = useRef<number | null>(null);
+  const defaultCategory = useMemo(() => getDefaultCategory(categories), [categories]);
+  const defaultPaymentMethod = useMemo(
+    () => getDefaultPaymentMethod(paymentMethods),
+    [paymentMethods],
+  );
+  const categoryOptions = useMemo(
+    () => (categories.length > 0 ? categories : [defaultCategory]),
+    [categories, defaultCategory],
+  );
 
   useEffect(() => {
     focusAmountInput(amountInputRef.current, false);
@@ -78,11 +95,10 @@ export const MovementForm = ({
 
   useEffect(() => {
     if (!editingMovement) {
-      setForm(defaults);
-      setErrors({});
       return;
     }
 
+    previousEditingIdRef.current = editingMovement.id ?? null;
     setForm({
       type: editingMovement.type,
       amount: formatAmountFromCents(editingMovement.amountCents, { currency: false }),
@@ -91,12 +107,64 @@ export const MovementForm = ({
       paymentMethod: editingMovement.paymentMethod,
       note: editingMovement.note ?? '',
     });
+    setShowOptionalFields(true);
     setErrors({});
 
     requestAnimationFrame(() => {
       focusAmountInput(amountInputRef.current, true);
     });
-  }, [defaults, editingMovement]);
+  }, [editingMovement]);
+
+  useEffect(() => {
+    if (editingMovement) {
+      return;
+    }
+
+    if (previousEditingIdRef.current === null) {
+      return;
+    }
+
+    previousEditingIdRef.current = null;
+    setForm((current) => ({
+      ...getDefaultState(categories, paymentMethods, current.type),
+      category: categoryOptions.includes(current.category) ? current.category : defaultCategory,
+      paymentMethod: paymentMethods.includes(current.paymentMethod)
+        ? current.paymentMethod
+        : defaultPaymentMethod,
+    }));
+    setErrors({});
+    setShowOptionalFields(false);
+
+    requestAnimationFrame(() => {
+      focusAmountInput(amountInputRef.current, true);
+    });
+  }, [
+    categories,
+    categoryOptions,
+    defaultCategory,
+    defaultPaymentMethod,
+    editingMovement,
+    paymentMethods,
+  ]);
+
+  useEffect(() => {
+    setForm((current) => {
+      const nextCategory = categories.includes(current.category) ? current.category : defaultCategory;
+      const nextPaymentMethod = paymentMethods.includes(current.paymentMethod)
+        ? current.paymentMethod
+        : defaultPaymentMethod;
+
+      if (nextCategory === current.category && nextPaymentMethod === current.paymentMethod) {
+        return current;
+      }
+
+      return {
+        ...current,
+        category: nextCategory,
+        paymentMethod: nextPaymentMethod,
+      };
+    });
+  }, [categories, defaultCategory, defaultPaymentMethod, paymentMethods]);
 
   const setField = <Key extends keyof FormState>(key: Key, value: FormState[Key]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -123,6 +191,30 @@ export const MovementForm = ({
     }
 
     return nextErrors;
+  };
+
+  const focusFirstInvalidField = (nextErrors: ErrorState) => {
+    if (nextErrors.amount) {
+      focusAmountInput(amountInputRef.current, true);
+      return;
+    }
+
+    if (nextErrors.category) {
+      focusElement(categoryFieldRef.current);
+      return;
+    }
+
+    if (nextErrors.date) {
+      focusElement(dateFieldRef.current);
+      return;
+    }
+
+    if (nextErrors.paymentMethod) {
+      setShowOptionalFields(true);
+      requestAnimationFrame(() => {
+        focusElement(paymentFieldRef.current);
+      });
+    }
   };
 
   const clearAmountError = () => {
@@ -174,12 +266,14 @@ export const MovementForm = ({
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
+      focusFirstInvalidField(nextErrors);
       return;
     }
 
     const parsedAmount = parseAmountToCents(form.amount);
     if (parsedAmount === null) {
       setErrors((current) => ({ ...current, amount: 'Monto invalido.' }));
+      focusAmountInput(amountInputRef.current, true);
       return;
     }
 
@@ -195,7 +289,17 @@ export const MovementForm = ({
       });
 
       if (!editingMovement) {
-        setForm(defaults);
+        setForm((current) => ({
+          ...current,
+          amount: '',
+          note: '',
+          date: todayIsoDate(),
+          category: categoryOptions.includes(current.category) ? current.category : defaultCategory,
+          paymentMethod: paymentMethods.includes(current.paymentMethod)
+            ? current.paymentMethod
+            : defaultPaymentMethod,
+        }));
+        setShowOptionalFields(false);
       }
 
       setErrors({});
@@ -216,11 +320,25 @@ export const MovementForm = ({
   };
 
   const handleCancelEdit = () => {
-    setForm(defaults);
+    previousEditingIdRef.current = null;
+    setForm((current) => getDefaultState(categories, paymentMethods, current.type));
     setErrors({});
+    setShowOptionalFields(false);
     onCancelEdit();
     requestAnimationFrame(() => {
       focusAmountInput(amountInputRef.current, true);
+    });
+  };
+
+  const toggleOptionalFields = () => {
+    setShowOptionalFields((current) => {
+      const next = !current;
+      if (next) {
+        requestAnimationFrame(() => {
+          focusElement(paymentFieldRef.current);
+        });
+      }
+      return next;
     });
   };
 
@@ -245,12 +363,13 @@ export const MovementForm = ({
         </div>
 
         <label className="form-field">
-          <span>Monto</span>
+          <span>Monto (ARS)</span>
           <input
             ref={amountInputRef}
             className={`field amount-field ${errors.amount ? 'field-error' : ''}`}
             type="text"
             inputMode="decimal"
+            pattern="[0-9.,]*"
             enterKeyHint="next"
             autoComplete="off"
             placeholder="0,00"
@@ -259,6 +378,7 @@ export const MovementForm = ({
             onBlur={handleAmountBlur}
             onFocus={(event) => event.currentTarget.select()}
             onKeyDown={(event) => handleAdvanceOnEnter(event, categoryFieldRef.current)}
+            aria-invalid={Boolean(errors.amount)}
           />
           {errors.amount ? <small className="error-text">{errors.amount}</small> : null}
         </label>
@@ -280,8 +400,9 @@ export const MovementForm = ({
               value={form.category}
               onChange={(event) => setField('category', event.target.value)}
               onKeyDown={(event) => handleAdvanceOnEnter(event, dateFieldRef.current)}
+              aria-invalid={Boolean(errors.category)}
             >
-              {categories.map((category) => (
+              {categoryOptions.map((category) => (
                 <option key={category} value={category}>
                   {category}
                 </option>
@@ -299,49 +420,69 @@ export const MovementForm = ({
               enterKeyHint="next"
               value={form.date}
               onChange={(event) => setField('date', event.target.value)}
-              onKeyDown={(event) => handleAdvanceOnEnter(event, paymentFieldRef.current)}
+              onKeyDown={(event) =>
+                handleAdvanceOnEnter(
+                  event,
+                  showOptionalFields ? paymentFieldRef.current : amountInputRef.current,
+                )
+              }
+              aria-invalid={Boolean(errors.date)}
             />
             {errors.date ? <small className="error-text">{errors.date}</small> : null}
           </label>
         </div>
 
-        <label className="form-field">
-          <span>Metodo de pago</span>
-          <select
-            ref={paymentFieldRef}
-            className={`field ${errors.paymentMethod ? 'field-error' : ''}`}
-            value={form.paymentMethod}
-            onChange={(event) => setField('paymentMethod', event.target.value)}
-            onKeyDown={(event) => handleAdvanceOnEnter(event, noteFieldRef.current)}
-          >
-            {paymentMethods.map((method) => (
-              <option key={method} value={method}>
-                {method}
-              </option>
-            ))}
-          </select>
-          {errors.paymentMethod ? <small className="error-text">{errors.paymentMethod}</small> : null}
-        </label>
+        <button
+          type="button"
+          className="text-button optional-toggle"
+          onClick={toggleOptionalFields}
+          aria-expanded={showOptionalFields}
+        >
+          {showOptionalFields ? 'Ocultar detalles opcionales' : 'Agregar metodo de pago y nota'}
+        </button>
 
-        <label className="form-field">
-          <span>Nota (opcional)</span>
-          <textarea
-            ref={noteFieldRef}
-            className="field"
-            rows={3}
-            maxLength={200}
-            enterKeyHint="done"
-            value={form.note}
-            onChange={(event) => setField('note', event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-            placeholder="Detalle breve"
-          />
-        </label>
+        {showOptionalFields ? (
+          <div className="optional-fields">
+            <label className="form-field">
+              <span>Metodo de pago</span>
+              <select
+                ref={paymentFieldRef}
+                className={`field ${errors.paymentMethod ? 'field-error' : ''}`}
+                value={form.paymentMethod}
+                onChange={(event) => setField('paymentMethod', event.target.value)}
+                onKeyDown={(event) => handleAdvanceOnEnter(event, noteFieldRef.current)}
+                aria-invalid={Boolean(errors.paymentMethod)}
+              >
+                {paymentMethods.map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+              {errors.paymentMethod ? <small className="error-text">{errors.paymentMethod}</small> : null}
+            </label>
+
+            <label className="form-field">
+              <span>Nota (opcional)</span>
+              <textarea
+                ref={noteFieldRef}
+                className="field"
+                rows={3}
+                maxLength={200}
+                enterKeyHint="done"
+                value={form.note}
+                onChange={(event) => setField('note', event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder="Detalle breve"
+              />
+            </label>
+          </div>
+        ) : null}
 
         <div className="actions-row">
           {editingMovement ? (
@@ -355,8 +496,8 @@ export const MovementForm = ({
               : editingMovement
                 ? 'Guardar cambios'
                 : form.type === 'gasto'
-                  ? 'Cargar gasto'
-                  : 'Cargar ingreso'}
+                  ? 'Guardar gasto'
+                  : 'Guardar ingreso'}
           </button>
         </div>
       </form>

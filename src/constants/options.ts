@@ -9,7 +9,7 @@ export const DEFAULT_CATEGORY_SEED: readonly CategorySeed[] = [
   { name: 'Alquiler', type: 'gasto', isDefault: true },
   { name: 'Servicios', type: 'gasto', isDefault: true },
   { name: 'Salud', type: 'gasto', isDefault: true },
-  { name: 'Ocio', type: 'gasto', isDefault: true },
+  { name: 'Salidas', type: 'gasto', isDefault: true },
   { name: 'Sueldo', type: 'ingreso', isDefault: true },
   { name: DEFAULT_CATEGORY_NAME, type: 'both', isDefault: true },
 ] as const;

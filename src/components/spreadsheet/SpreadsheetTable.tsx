@@ -214,6 +214,9 @@ const createDraftRow = (categories: string[], paymentMethods: string[]): Spreads
 });
 
 const makeCellErrorKey = (rowKey: string, column: SpreadsheetColumnKey): string => `${rowKey}:${column}`;
+const isSameCell = (left: SpreadsheetCellPosition | null, right: SpreadsheetCellPosition): boolean => {
+  return left !== null && left.rowKey === right.rowKey && left.column === right.column;
+};
 
 const sanitizeCellInput = (column: SpreadsheetColumnKey, value: string): string => {
   if (column === 'amount') {
@@ -555,13 +558,13 @@ export const SpreadsheetTable = ({
 
   const applyNavigation = (origin: SpreadsheetCellPosition, intent: SpreadsheetNavigationIntent) => {
     if (intent === 'stay') {
-      setActiveCell(null);
+      setActiveCell((current) => (isSameCell(current, origin) ? null : current));
       return;
     }
 
     const next = moveFrom(origin, intent);
     if (!next) {
-      setActiveCell(null);
+      setActiveCell((current) => (isSameCell(current, origin) ? null : current));
       return;
     }
 
@@ -820,7 +823,8 @@ export const SpreadsheetTable = ({
     }
 
     if (column === 'category') {
-      return categories.map((category) => ({ value: category, label: category }));
+      const source = categories.length > 0 ? categories : [defaults.category];
+      return source.map((category) => ({ value: category, label: category }));
     }
 
     if (column === 'paymentMethod') {
@@ -980,14 +984,14 @@ export const SpreadsheetTable = ({
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por categoria, nota o fecha"
+          placeholder="Buscar categoria, nota o fecha"
           aria-label="Buscar movimientos en planilla"
         />
       </header>
 
       <div className="spreadsheet-toolbar">
         <p className="spreadsheet-help">
-          Enter guarda y baja. Tab avanza. Shift+Tab retrocede. Escape cancela. Pega multiples filas con Ctrl+V.
+          Enter guarda y baja. Tab avanza. Shift+Tab retrocede. Escape cancela. Pegado multiple con Ctrl+V.
         </p>
         <button type="button" className="button button-primary" onClick={handleAddDraftRow}>
           + Nueva fila
