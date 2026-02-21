@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { MovementForm } from '../components/movements/MovementForm';
 import { MovementHistory } from '../components/movements/MovementHistory';
+import { SpreadsheetTable } from '../components/spreadsheet/SpreadsheetTable';
 import { useToast } from '../hooks/useToast';
 import type { MovementDraft, MovementRecord } from '../types/movement';
 import { applySearchFilter } from '../utils/filters';
@@ -25,10 +26,17 @@ export const MovementsPage = ({
 }: MovementsPageProps) => {
   const { pushToast } = useToast();
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'sheet'>('list');
   const [editingMovement, setEditingMovement] = useState<MovementRecord | null>(null);
   const [movementToDelete, setMovementToDelete] = useState<MovementRecord | null>(null);
 
   const visibleMovements = useMemo(() => applySearchFilter(movements, search), [movements, search]);
+
+  useEffect(() => {
+    if (viewMode === 'sheet') {
+      setEditingMovement(null);
+    }
+  }, [viewMode]);
 
   const handleSubmit = async (draft: MovementDraft) => {
     try {
@@ -95,13 +103,50 @@ export const MovementsPage = ({
         onCancelEdit={() => setEditingMovement(null)}
       />
 
-      <MovementHistory
-        movements={visibleMovements}
-        search={search}
-        onSearchChange={setSearch}
-        onEdit={setEditingMovement}
-        onDeleteRequest={setMovementToDelete}
-      />
+      <div className="movements-panel">
+        <section className="card view-mode-card">
+          <div className="section-header">
+            <h2>Movimientos</h2>
+            <div className="segmented-control view-mode-control" role="tablist" aria-label="Cambiar vista">
+              <button
+                type="button"
+                className={`segmented-option ${viewMode === 'list' ? 'is-active' : ''}`}
+                onClick={() => setViewMode('list')}
+              >
+                Vista lista
+              </button>
+              <button
+                type="button"
+                className={`segmented-option ${viewMode === 'sheet' ? 'is-active' : ''}`}
+                onClick={() => setViewMode('sheet')}
+              >
+                Vista planilla
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {viewMode === 'list' ? (
+          <MovementHistory
+            movements={visibleMovements}
+            search={search}
+            onSearchChange={setSearch}
+            onEdit={setEditingMovement}
+            onDeleteRequest={setMovementToDelete}
+          />
+        ) : (
+          <SpreadsheetTable
+            movements={visibleMovements}
+            search={search}
+            categories={categories}
+            paymentMethods={paymentMethods}
+            onSearchChange={setSearch}
+            onCreateMovement={onCreateMovement}
+            onUpdateMovement={onUpdateMovement}
+            onDeleteRequest={setMovementToDelete}
+          />
+        )}
+      </div>
 
       <ConfirmDialog
         open={movementToDelete !== null}
