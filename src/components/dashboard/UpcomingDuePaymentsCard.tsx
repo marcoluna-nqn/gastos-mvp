@@ -1,4 +1,4 @@
-﻿import { useMemo } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import type { MovementRecord } from '../../types/movement';
 import { formatArs } from '../../utils/currency';
 import { formatDisplayDate, todayIsoDate } from '../../utils/date';
@@ -10,9 +10,36 @@ interface UpcomingDuePaymentsCardProps {
 }
 
 const MAX_REMINDERS = 6;
+const TODAY_REFRESH_INTERVAL_MS = 60_000;
 
 export const UpcomingDuePaymentsCard = ({ movements }: UpcomingDuePaymentsCardProps) => {
-  const reminders = useMemo(() => buildUpcomingReminderItems(movements, todayIsoDate()), [movements]);
+  const [todayKey, setTodayKey] = useState(() => todayIsoDate());
+
+  useEffect(() => {
+    const refreshTodayKey = () => {
+      const next = todayIsoDate();
+      setTodayKey((current) => (current === next ? current : next));
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshTodayKey();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshTodayKey, TODAY_REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  const reminders = useMemo(
+    () => buildUpcomingReminderItems(movements, todayKey),
+    [movements, todayKey],
+  );
 
   return (
     <article className="card due-payments-card">

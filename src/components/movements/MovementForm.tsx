@@ -48,9 +48,11 @@ const isIsoDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 const normalizeCategoryName = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
-const hasCategory = (categories: string[], candidate: string): boolean => {
+const findCanonicalCategoryName = (categories: string[], candidate: string): string | null => {
   const normalizedCandidate = normalizeCategoryName(candidate).toLocaleLowerCase('es');
-  return categories.some((category) => category.toLocaleLowerCase('es') === normalizedCandidate);
+  return (
+    categories.find((category) => category.toLocaleLowerCase('es') === normalizedCandidate) ?? null
+  );
 };
 
 const getDefaultCategory = (categories: string[]): string => categories[0] ?? 'Otros';
@@ -80,6 +82,14 @@ const focusAmountInput = (input: HTMLInputElement | null, shouldSelect = true): 
   if (shouldSelect) {
     input.select();
   }
+};
+
+const resolveCategoryChoice = (
+  availableCategories: string[],
+  candidate: string,
+  fallback: string,
+): string => {
+  return findCanonicalCategoryName(availableCategories, candidate) ?? fallback;
 };
 
 export const MovementForm = ({
@@ -162,7 +172,7 @@ export const MovementForm = ({
     previousEditingIdRef.current = null;
     setForm((current) => ({
       ...getDefaultState(categories, paymentMethods, current.type),
-      category: categoryOptions.includes(current.category) ? current.category : defaultCategory,
+      category: resolveCategoryChoice(categoryOptions, current.category, defaultCategory),
       paymentMethod: paymentMethods.includes(current.paymentMethod)
         ? current.paymentMethod
         : defaultPaymentMethod,
@@ -185,7 +195,7 @@ export const MovementForm = ({
 
   useEffect(() => {
     setForm((current) => {
-      const nextCategory = categories.includes(current.category) ? current.category : defaultCategory;
+      const nextCategory = resolveCategoryChoice(categories, current.category, defaultCategory);
       const nextPaymentMethod = paymentMethods.includes(current.paymentMethod)
         ? current.paymentMethod
         : defaultPaymentMethod;
@@ -356,7 +366,7 @@ export const MovementForm = ({
           date: todayIsoDate(),
           dueDate: '',
           isPaymentReminder: false,
-          category: categoryOptions.includes(current.category) ? current.category : defaultCategory,
+          category: resolveCategoryChoice(categoryOptions, current.category, defaultCategory),
           paymentMethod: paymentMethods.includes(current.paymentMethod)
             ? current.paymentMethod
             : defaultPaymentMethod,
@@ -420,8 +430,9 @@ export const MovementForm = ({
       return;
     }
 
-    if (hasCategory(categoryOptions, normalizedName)) {
-      setField('category', normalizedName);
+    const existingCategory = findCanonicalCategoryName(categoryOptions, normalizedName);
+    if (existingCategory) {
+      setField('category', existingCategory);
       setQuickCategoryName('');
       setErrors((current) => ({ ...current, quickCategory: undefined }));
       return;
@@ -430,7 +441,8 @@ export const MovementForm = ({
     setIsCreatingCategory(true);
     try {
       await onQuickCreateCategory(normalizedName);
-      setField('category', normalizedName);
+      const canonicalCategory = findCanonicalCategoryName(categoryOptions, normalizedName) ?? normalizedName;
+      setField('category', canonicalCategory);
       setQuickCategoryName('');
       setErrors((current) => ({ ...current, quickCategory: undefined }));
     } catch (error) {

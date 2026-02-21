@@ -8,9 +8,17 @@ const sanitizeNote = (value: string | undefined): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+const normalizeCategoryName = (value: string): string => {
+  return value.trim().replace(/\s+/g, ' ');
+};
+
+const categoryNameToLower = (value: string): string => {
+  return normalizeCategoryName(value).toLocaleLowerCase('es-AR');
+};
+
 const sanitizeCategory = (value: string): string => {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : DEFAULT_CATEGORY_NAME;
+  const normalized = normalizeCategoryName(value);
+  return normalized ? normalized : DEFAULT_CATEGORY_NAME;
 };
 
 const sanitizeDueDate = (value: string | undefined): string | undefined => {
@@ -30,6 +38,16 @@ const sanitizeReminderFlags = (
     isBill: reminder,
     isPaymentReminder: reminder,
   };
+};
+
+const resolveCanonicalCategoryName = async (inputCategory: string): Promise<string> => {
+  const normalizedCategory = sanitizeCategory(inputCategory);
+  const existingCategory = await db.categories
+    .where('nameLower')
+    .equals(categoryNameToLower(normalizedCategory))
+    .first();
+
+  return existingCategory?.name ?? normalizedCategory;
 };
 
 const buildRecord = (draft: MovementDraft): Omit<MovementRecord, 'id'> => {
@@ -62,9 +80,14 @@ export const getAllMovements = async (): Promise<MovementRecord[]> => {
 };
 
 export const createMovement = async (draft: MovementDraft): Promise<number> => {
-  const normalizedCategory = sanitizeCategory(draft.category);
-  await ensureCategoryExists(normalizedCategory, draft.type);
-  return db.movements.add(buildRecord(draft));
+  const canonicalCategory = await resolveCanonicalCategoryName(draft.category);
+  await ensureCategoryExists(canonicalCategory, draft.type);
+  return db.movements.add(
+    buildRecord({
+      ...draft,
+      category: canonicalCategory,
+    }),
+  );
 };
 
 export const updateMovement = async (id: number, draft: MovementDraft): Promise<void> => {
@@ -73,15 +96,15 @@ export const updateMovement = async (id: number, draft: MovementDraft): Promise<
     throw new Error('No se encontró el movimiento que intentaste editar.');
   }
 
-  const normalizedCategory = sanitizeCategory(draft.category);
+  const canonicalCategory = await resolveCanonicalCategoryName(draft.category);
   const dueDate = sanitizeDueDate(draft.dueDate);
   const reminderFlags = sanitizeReminderFlags(draft);
   const shouldRemind = Boolean(dueDate && reminderFlags.isPaymentReminder);
-  await ensureCategoryExists(normalizedCategory, draft.type);
+  await ensureCategoryExists(canonicalCategory, draft.type);
 
   await db.movements.update(id, {
     ...draft,
-    category: normalizedCategory,
+    category: canonicalCategory,
     dueDate,
     isBill: shouldRemind,
     isPaymentReminder: shouldRemind,
@@ -111,7 +134,16 @@ export const importMovements = async (
     return 0;
   }
 
-  const categoryInputs = [...new Set(sanitized.map((item) => sanitizeCategory(item.category)))];
+  const categoryInputsByLower = new Map<string, string>();
+  for (const item of sanitized) {
+    const category = sanitizeCategory(item.category);
+    const lower = categoryNameToLower(category);
+    if (!categoryInputsByLower.has(lower)) {
+      categoryInputsByLower.set(lower, category);
+    }
+  }
+
+  const categoryInputs = [...categoryInputsByLower.values()];
   await ensureCategoriesExist(
     categoryInputs.map((name) => ({
       name,
@@ -119,20 +151,25 @@ export const importMovements = async (
     })),
   );
 
-  await db.transaction('rw', db.movements, async () => {
+  await db.transaction('rw', db.movements, db.categories, async () => {
     if (strategy === 'replace') {
       await db.movements.clear();
     }
 
+    const categories = await db.categories.toArray();
+    const categoryNameMap = new Map(categories.map((category) => [category.nameLower, category.name]));
     const now = new Date().toISOString();
     const rows: Omit<MovementRecord, 'id'>[] = sanitized.map((item) => {
       const dueDate = sanitizeDueDate(item.dueDate);
       const reminderFlags = sanitizeReminderFlags(item);
       const shouldRemind = Boolean(dueDate && reminderFlags.isPaymentReminder);
+      const normalizedCategory = sanitizeCategory(item.category);
+      const canonicalCategory =
+        categoryNameMap.get(categoryNameToLower(normalizedCategory)) ?? normalizedCategory;
 
       return {
         ...item,
-        category: sanitizeCategory(item.category),
+        category: canonicalCategory,
         dueDate,
         isBill: shouldRemind,
         isPaymentReminder: shouldRemind,
