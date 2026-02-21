@@ -2,7 +2,11 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export const todayIsoDate = (): string => {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export const toMonthKey = (isoDate: string): string => {
@@ -24,7 +28,7 @@ export const fileSafeDate = (): string => {
 };
 
 export const currentMonthKey = (): string => {
-  return new Date().toISOString().slice(0, 7);
+  return todayIsoDate().slice(0, 7);
 };
 
 export const nextMonthKey = (monthKey: string): string => {

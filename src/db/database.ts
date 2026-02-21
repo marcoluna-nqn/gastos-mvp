@@ -2,12 +2,14 @@ import Dexie, { type Table } from 'dexie';
 import { DATABASE_NAME, DEFAULT_CATEGORY_SEED } from '../constants/options';
 import type { CategoryRecord } from '../types/category';
 import type { BudgetRecord } from '../types/budget';
+import type { SavingsGoalRecord } from '../types/savingsGoal';
 import type { MovementRecord } from '../types/movement';
 
 class GastosDatabase extends Dexie {
   movements!: Table<MovementRecord, number>;
   categories!: Table<CategoryRecord, number>;
   budgets!: Table<BudgetRecord, number>;
+  savingsGoals!: Table<SavingsGoalRecord, number>;
 
   constructor() {
     super(DATABASE_NAME);
@@ -74,6 +76,13 @@ class GastosDatabase extends Dexie {
       movements: '++id, type, category, date, paymentMethod, amountCents, createdAt',
       categories: '++id, &nameLower, name, type, isDefault, createdAt, updatedAt',
       budgets: '++id, &[monthKey+categoryId], monthKey, categoryId, updatedAt, createdAt',
+    });
+
+    this.version(4).stores({
+      movements: '++id, type, category, date, paymentMethod, amountCents, createdAt',
+      categories: '++id, &nameLower, name, type, isDefault, createdAt, updatedAt',
+      budgets: '++id, &[monthKey+categoryId], monthKey, categoryId, updatedAt, createdAt',
+      savingsGoals: '++id, &monthKey, monthKey, updatedAt, createdAt',
     });
   }
 }

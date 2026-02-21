@@ -31,6 +31,11 @@ Aplicacion web local-first para gestion de gastos personales. Permite registrar 
   - Configuracion por mes desde modal "Presupuestos"
   - Alertas visuales por estado (`OK`, `Atencion`, `Excedido`)
   - Resumen de presupuesto mensual integrado en Dashboard
+- Proyeccion financiera mensual (v1.5):
+  - Objetivo de ahorro mensual persistido en Dexie
+  - Card "Proyeccion del mes" con semaforo (`OK`, `Atencion`, `Riesgo`, `Sin objetivo`)
+  - Calculo real de cierre de mes segun ritmo actual (mes actual/pasado/futuro)
+  - Metricas accionables: margen de gasto restante, gasto diario recomendado y ritmo diario actual
 - Persistencia real en `IndexedDB` con Dexie.
 - Import/Export:
   - Export JSON (backup completo de toda la base local)
@@ -68,6 +73,7 @@ src/
     common/
     dashboard/
     filters/
+    goals/
     layout/
     movements/
     spreadsheet/

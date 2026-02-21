@@ -6,6 +6,7 @@ import { DEFAULT_FILTERS, INITIAL_PAYMENT_METHODS } from './constants/options';
 import { useBudgets } from './hooks/useBudgets';
 import { useCategories } from './hooks/useCategories';
 import { useMovements } from './hooks/useMovements';
+import { useSavingsGoals } from './hooks/useSavingsGoals';
 import { useTheme } from './hooks/useTheme';
 import { BackupPage } from './pages/BackupPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -32,6 +33,11 @@ function App() {
     deleteCategory,
   } = useCategories();
   const { budgets, saveBudget, deleteBudget, copyBudgetsToMonth } = useBudgets();
+  const {
+    savingsGoals,
+    saveSavingsGoal,
+    deleteSavingsGoalByMonth,
+  } = useSavingsGoals();
   const {
     movements,
     loading,
@@ -90,8 +96,11 @@ function App() {
                 allMovements={movements}
                 categories={categoryRecords}
                 budgets={budgets}
+                savingsGoals={savingsGoals}
                 filterMonthKey={normalizedFilters.month}
                 loading={loading}
+                onSaveSavingsGoal={saveSavingsGoal}
+                onDeleteSavingsGoalByMonth={deleteSavingsGoalByMonth}
               />
             }
           />
