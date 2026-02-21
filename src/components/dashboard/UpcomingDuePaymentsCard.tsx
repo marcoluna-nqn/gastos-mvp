@@ -50,7 +50,7 @@ export const UpcomingDuePaymentsCard = ({ movements }: UpcomingDuePaymentsCardPr
       {reminders.length === 0 ? (
         <EmptyState
           title="Sin alertas por ahora"
-          description='Activa "Recordarme este pago" y agrega vencimiento en tus movimientos.'
+          description='No hay pagos por vencer en los proximos 7 dias.'
         />
       ) : (
         <ul className="due-list">

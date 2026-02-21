@@ -1115,7 +1115,7 @@ export const SpreadsheetTable = ({
       {rows.length === 0 ? (
         <EmptyState
           title="No hay movimientos para mostrar"
-          description="Proba cambiando filtros o agrega una fila nueva para empezar."
+          description="Ajusta filtros o crea una fila nueva para empezar."
         />
       ) : (
         <div className="spreadsheet-scroll" onPaste={(event) => void handleSpreadsheetPaste(event)}>

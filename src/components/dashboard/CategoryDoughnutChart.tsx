@@ -17,9 +17,12 @@ export const CategoryDoughnutChart = ({ breakdown }: CategoryDoughnutChartProps)
     return (
       <article className="card chart-card">
         <header className="section-header">
-          <h2>Gastos por categoría</h2>
+          <h2>Gastos por categoria</h2>
         </header>
-        <EmptyState title="Sin gastos en este filtro" description="Agregá movimientos o ajustá filtros para ver el gráfico." />
+        <EmptyState
+          title="Sin gastos en este filtro"
+          description="Agrega movimientos o cambia filtros para ver el grafico."
+        />
       </article>
     );
   }
@@ -38,7 +41,7 @@ export const CategoryDoughnutChart = ({ breakdown }: CategoryDoughnutChartProps)
   return (
     <article className="card chart-card">
       <header className="section-header">
-        <h2>Gastos por categoría</h2>
+        <h2>Gastos por categoria</h2>
       </header>
       <div className="chart-wrapper">
         <Doughnut

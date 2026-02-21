@@ -38,7 +38,7 @@ export const MovementHistory = ({
       </header>
 
       {movements.length === 0 ? (
-        <EmptyState title="No hay movimientos" description="Cuando cargues movimientos, apareceran aca." />
+        <EmptyState title="No hay movimientos" description="Carga tu primer movimiento para empezar." />
       ) : (
         <ul className="movement-list">
           {movements.map((movement) => {

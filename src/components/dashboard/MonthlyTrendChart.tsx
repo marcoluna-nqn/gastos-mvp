@@ -25,9 +25,12 @@ export const MonthlyTrendChart = ({ trend }: MonthlyTrendChartProps) => {
     return (
       <article className="card chart-card">
         <header className="section-header">
-          <h2>Evolución mensual</h2>
+          <h2>Evolucion mensual</h2>
         </header>
-        <EmptyState title="Sin datos mensuales" description="Registrá movimientos para generar la evolución." />
+        <EmptyState
+          title="Sin datos mensuales"
+          description="Registra movimientos para generar la evolucion."
+        />
       </article>
     );
   }
@@ -63,7 +66,7 @@ export const MonthlyTrendChart = ({ trend }: MonthlyTrendChartProps) => {
   return (
     <article className="card chart-card">
       <header className="section-header">
-        <h2>Evolución mensual</h2>
+        <h2>Evolucion mensual</h2>
       </header>
       <div className="chart-wrapper">
         <Line
@@ -78,7 +81,8 @@ export const MonthlyTrendChart = ({ trend }: MonthlyTrendChartProps) => {
             plugins: {
               tooltip: {
                 callbacks: {
-                  label: (context) => `${context.dataset.label}: ${formatArs(Math.round((context.parsed.y ?? 0) * 100))}`,
+                  label: (context) =>
+                    `${context.dataset.label}: ${formatArs(Math.round((context.parsed.y ?? 0) * 100))}`,
                 },
               },
             },
