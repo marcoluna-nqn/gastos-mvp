@@ -18,6 +18,10 @@ Aplicacion web local-first para gestion de gastos personales. Permite registrar 
   - Grafico lineal de evolucion mensual
 - Filtros globales por `mes`, `categoria` y `tipo` (afectan dashboard, listado y exportes de reporte).
 - Historial con busqueda y edicion rapida.
+- Modo planilla editable inline tipo Excel para carga masiva:
+  - Edicion por celda (click/tap)
+  - Enter, Tab, Shift+Tab y Escape para flujo rapido
+  - Fila rapida `+ Nueva fila` con guardado inline
 - Persistencia real en `IndexedDB` con Dexie.
 - Import/Export:
   - Export JSON (backup completo de toda la base local)
