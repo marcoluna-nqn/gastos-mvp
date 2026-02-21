@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { ToastViewport } from './components/common/ToastViewport';
 import { DEFAULT_FILTERS, INITIAL_PAYMENT_METHODS } from './constants/options';
+import { useBudgets } from './hooks/useBudgets';
 import { useCategories } from './hooks/useCategories';
 import { useMovements } from './hooks/useMovements';
 import { useTheme } from './hooks/useTheme';
@@ -30,6 +31,7 @@ function App() {
     updateCategory,
     deleteCategory,
   } = useCategories();
+  const { budgets, saveBudget, deleteBudget, copyBudgetsToMonth } = useBudgets();
   const {
     movements,
     loading,
@@ -53,12 +55,26 @@ function App() {
     return buildMonths(movements.map((entry) => toMonthKey(entry.date)));
   }, [movements]);
 
-  const filteredMovements = useMemo(() => applyMovementFilters(movements, filters), [filters, movements]);
+  const normalizedFilters = useMemo(() => {
+    if (filters.category === 'all' || categories.includes(filters.category)) {
+      return filters;
+    }
+
+    return {
+      ...filters,
+      category: 'all',
+    };
+  }, [categories, filters]);
+
+  const filteredMovements = useMemo(
+    () => applyMovementFilters(movements, normalizedFilters),
+    [movements, normalizedFilters],
+  );
 
   return (
     <>
       <AppLayout
-        filters={filters}
+        filters={normalizedFilters}
         categories={categories}
         months={months}
         theme={theme}
@@ -66,7 +82,19 @@ function App() {
         onToggleTheme={toggleTheme}
       >
         <Routes>
-          <Route path="/" element={<DashboardPage movements={filteredMovements} loading={loading} />} />
+          <Route
+            path="/"
+            element={
+              <DashboardPage
+                movements={filteredMovements}
+                allMovements={movements}
+                categories={categoryRecords}
+                budgets={budgets}
+                filterMonthKey={normalizedFilters.month}
+                loading={loading}
+              />
+            }
+          />
           <Route
             path="/movimientos"
             element={
@@ -74,13 +102,18 @@ function App() {
                 movements={filteredMovements}
                 categories={categories}
                 categoryRecords={categoryRecords}
+                budgets={budgets}
                 paymentMethods={paymentMethods}
+                filterMonthKey={normalizedFilters.month}
                 onCreateMovement={createMovement}
                 onUpdateMovement={updateMovement}
                 onDeleteMovement={deleteMovement}
                 onCreateCategory={createCategory}
                 onUpdateCategory={updateCategory}
                 onDeleteCategory={deleteCategory}
+                onSaveBudget={saveBudget}
+                onDeleteBudget={deleteBudget}
+                onCopyBudgetsToMonth={copyBudgetsToMonth}
               />
             }
           />
@@ -90,7 +123,7 @@ function App() {
               <BackupPage
                 movements={movements}
                 filteredMovements={filteredMovements}
-                filters={filters}
+                filters={normalizedFilters}
                 onImportMovements={importManyMovements}
               />
             }

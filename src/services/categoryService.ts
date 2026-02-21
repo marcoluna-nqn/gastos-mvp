@@ -169,7 +169,7 @@ export const updateCategory = async (
 };
 
 export const deleteCategoryAndReassign = async (id: number): Promise<void> => {
-  await db.transaction('rw', db.categories, db.movements, async () => {
+  await db.transaction('rw', db.categories, db.movements, db.budgets, async () => {
     const category = await db.categories.get(id);
     if (!category) {
       throw new Error('No se encontro la categoria seleccionada.');
@@ -184,6 +184,7 @@ export const deleteCategoryAndReassign = async (id: number): Promise<void> => {
       category: fallback.name,
       updatedAt: nowIso(),
     });
+    await db.budgets.where('categoryId').equals(id).delete();
 
     await db.categories.delete(id);
   });

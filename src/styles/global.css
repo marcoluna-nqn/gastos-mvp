@@ -283,6 +283,47 @@ textarea {
   gap: 0.8rem;
 }
 
+.budget-summary-card {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.budget-month-pill {
+  font-size: 0.76rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--text-muted);
+  padding: 0.24rem 0.54rem;
+}
+
+.budget-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.budget-meter {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-secondary) 80%, var(--surface));
+}
+
+.budget-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #1f8a70, #e7ab34, #bf3f3f);
+}
+
+.budget-summary-stats {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
 .chart-wrapper {
   height: 280px;
   min-height: 220px;
@@ -714,6 +755,127 @@ textarea {
   gap: 0.5rem;
 }
 
+.budget-manager {
+  width: min(820px, 100%);
+  max-height: min(80vh, 790px);
+  overflow: auto;
+  gap: 0.95rem;
+}
+
+.budget-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.budget-overview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  padding: 0.62rem 0.75rem;
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.budget-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.budget-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.budget-item-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.budget-category-name {
+  font-weight: 680;
+}
+
+.budget-values {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.budget-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface) 75%, var(--border));
+}
+
+.budget-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  transition: width 180ms ease;
+}
+
+.budget-status-ok {
+  background: color-mix(in srgb, var(--success) 75%, transparent);
+  color: var(--success);
+}
+
+.budget-status-warning {
+  background: color-mix(in srgb, #e7ab34 80%, transparent);
+  color: #9b6703;
+}
+
+.budget-status-exceeded {
+  background: color-mix(in srgb, var(--danger) 80%, transparent);
+  color: var(--danger);
+}
+
+.budget-status-none {
+  background: color-mix(in srgb, var(--text-soft) 35%, transparent);
+  color: var(--text-muted);
+}
+
+.budget-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.48rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.budget-item-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.budget-edit-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .upload-button {
   position: relative;
   overflow: hidden;
@@ -859,6 +1021,10 @@ textarea {
     grid-column: 1 / -1;
   }
 
+  .budget-summary-card {
+    grid-column: 1 / -1;
+  }
+
   .two-columns {
     grid-template-columns: minmax(330px, 0.95fr) minmax(0, 1.45fr);
     align-items: start;
@@ -893,6 +1059,15 @@ textarea {
 
   .category-edit-grid {
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .budget-controls {
+    flex-wrap: nowrap;
+  }
+
+  .budget-edit-row {
+    flex-wrap: nowrap;
     align-items: center;
   }
 }

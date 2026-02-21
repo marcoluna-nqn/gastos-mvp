@@ -1,3 +1,4 @@
+import { BudgetManager } from '../components/budgets/BudgetManager';
 import { useEffect, useMemo, useState } from 'react';
 import { CategoryManager } from '../components/categories/CategoryManager';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -5,6 +6,7 @@ import { MovementForm } from '../components/movements/MovementForm';
 import { MovementHistory } from '../components/movements/MovementHistory';
 import { SpreadsheetTable } from '../components/spreadsheet/SpreadsheetTable';
 import { useToast } from '../hooks/useToast';
+import type { BudgetRecord } from '../types/budget';
 import type { CategoryRecord, CategoryType } from '../types/category';
 import type { MovementDraft, MovementRecord } from '../types/movement';
 import { todayIsoDate } from '../utils/date';
@@ -14,13 +16,18 @@ interface MovementsPageProps {
   movements: MovementRecord[];
   categories: string[];
   categoryRecords: CategoryRecord[];
+  budgets: BudgetRecord[];
   paymentMethods: string[];
+  filterMonthKey: string;
   onCreateMovement: (draft: MovementDraft) => Promise<number>;
   onUpdateMovement: (id: number, draft: MovementDraft) => Promise<void>;
   onDeleteMovement: (id: number) => Promise<void>;
   onCreateCategory: (name: string, type: CategoryType) => Promise<unknown>;
   onUpdateCategory: (id: number, name: string, type: CategoryType) => Promise<void>;
   onDeleteCategory: (id: number) => Promise<void>;
+  onSaveBudget: (payload: { categoryId: number; monthKey: string; amountCents: number }) => Promise<unknown>;
+  onDeleteBudget: (budgetId: number) => Promise<void>;
+  onCopyBudgetsToMonth: (sourceMonthKey: string, targetMonthKey: string) => Promise<number>;
 }
 
 const cloneMovementToDraft = (movement: MovementRecord): MovementDraft => ({
@@ -36,13 +43,18 @@ export const MovementsPage = ({
   movements,
   categories,
   categoryRecords,
+  budgets,
   paymentMethods,
+  filterMonthKey,
   onCreateMovement,
   onUpdateMovement,
   onDeleteMovement,
   onCreateCategory,
   onUpdateCategory,
   onDeleteCategory,
+  onSaveBudget,
+  onDeleteBudget,
+  onCopyBudgetsToMonth,
 }: MovementsPageProps) => {
   const { pushToast } = useToast();
   const [search, setSearch] = useState('');
@@ -50,6 +62,7 @@ export const MovementsPage = ({
   const [editingMovement, setEditingMovement] = useState<MovementRecord | null>(null);
   const [movementToDelete, setMovementToDelete] = useState<MovementRecord | null>(null);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [budgetManagerOpen, setBudgetManagerOpen] = useState(false);
 
   const visibleMovements = useMemo(() => applySearchFilter(movements, search), [movements, search]);
 
@@ -182,6 +195,13 @@ export const MovementsPage = ({
               >
                 Gestionar categorias
               </button>
+              <button
+                type="button"
+                className="button button-secondary compact"
+                onClick={() => setBudgetManagerOpen(true)}
+              >
+                Presupuestos
+              </button>
               <div className="segmented-control view-mode-control" role="tablist" aria-label="Cambiar vista">
                 <button
                   type="button"
@@ -242,6 +262,18 @@ export const MovementsPage = ({
         onCreateCategory={handleCreateCategory}
         onUpdateCategory={handleUpdateCategory}
         onDeleteCategory={handleDeleteCategory}
+      />
+
+      <BudgetManager
+        open={budgetManagerOpen}
+        categories={categoryRecords}
+        budgets={budgets}
+        movements={movements}
+        monthFilterKey={filterMonthKey}
+        onClose={() => setBudgetManagerOpen(false)}
+        onSaveBudget={onSaveBudget}
+        onDeleteBudget={onDeleteBudget}
+        onCopyBudgetsToMonth={onCopyBudgetsToMonth}
       />
     </div>
   );

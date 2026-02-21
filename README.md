@@ -27,6 +27,10 @@ Aplicacion web local-first para gestion de gastos personales. Permite registrar 
   - Crear, editar y eliminar desde "Gestionar categorias"
   - Al eliminar una categoria, movimientos reasignados automaticamente a "Otros"
 - Duplicado rapido de movimientos (vista lista y planilla)
+- Presupuestos mensuales por categoria:
+  - Configuracion por mes desde modal "Presupuestos"
+  - Alertas visuales por estado (`OK`, `Atencion`, `Excedido`)
+  - Resumen de presupuesto mensual integrado en Dashboard
 - Persistencia real en `IndexedDB` con Dexie.
 - Import/Export:
   - Export JSON (backup completo de toda la base local)
@@ -59,6 +63,7 @@ Aplicacion web local-first para gestion de gastos personales. Permite registrar 
 ```txt
 src/
   components/
+    budgets/
     categories/
     common/
     dashboard/
