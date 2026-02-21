@@ -9,6 +9,7 @@ export default defineConfig({
   base: githubPagesBase,
   plugins: [react()],
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {

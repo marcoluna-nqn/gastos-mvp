@@ -73,7 +73,14 @@ function App() {
           />
           <Route
             path="/backup"
-            element={<BackupPage movements={movements} onImportMovements={importManyMovements} />}
+            element={
+              <BackupPage
+                movements={movements}
+                filteredMovements={filteredMovements}
+                filters={filters}
+                onImportMovements={importManyMovements}
+              />
+            }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

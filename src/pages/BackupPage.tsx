@@ -1,23 +1,54 @@
-import { useState } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import { useToast } from '../hooks/useToast';
+import { exportAsExcel } from '../services/excelExportService';
 import {
+  downloadBlobFile,
   downloadTextFile,
   exportAsCsv,
   exportAsJson,
   parseJsonBackup,
 } from '../services/exportImportService';
-import type { MovementDraft, MovementRecord } from '../types/movement';
-import { fileSafeDate } from '../utils/date';
+import type { MovementDraft, MovementFilters, MovementRecord } from '../types/movement';
+import { fileSafeDate, formatMonthLabel } from '../utils/date';
 
 interface BackupPageProps {
   movements: MovementRecord[];
+  filteredMovements: MovementRecord[];
+  filters: MovementFilters;
   onImportMovements: (drafts: MovementDraft[], strategy: 'merge' | 'replace') => Promise<number>;
 }
 
-export const BackupPage = ({ movements, onImportMovements }: BackupPageProps) => {
+const resolveMonthLabel = (monthFilter: string): string => {
+  if (monthFilter === 'all') {
+    return 'Todos';
+  }
+
+  try {
+    return formatMonthLabel(monthFilter);
+  } catch {
+    return monthFilter;
+  }
+};
+
+const resolveTypeLabel = (typeFilter: MovementFilters['type']): string => {
+  if (typeFilter === 'all') {
+    return 'Todos';
+  }
+
+  return typeFilter === 'ingreso' ? 'Ingresos' : 'Gastos';
+};
+
+export const BackupPage = ({ movements, filteredMovements, filters, onImportMovements }: BackupPageProps) => {
   const { pushToast } = useToast();
   const [strategy, setStrategy] = useState<'merge' | 'replace'>('merge');
   const [isImporting, setIsImporting] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+  const filterDescription = useMemo(() => {
+    return `Mes: ${resolveMonthLabel(filters.month)} · Categoria: ${
+      filters.category === 'all' ? 'Todas' : filters.category
+    } · Tipo: ${resolveTypeLabel(filters.type)}`;
+  }, [filters]);
 
   const handleExportJson = () => {
     const filename = `gastos-backup-${fileSafeDate()}.json`;
@@ -25,21 +56,43 @@ export const BackupPage = ({ movements, onImportMovements }: BackupPageProps) =>
     pushToast({
       tone: 'success',
       title: 'Backup JSON exportado',
-      description: `Se descargó ${filename}.`,
+      description: `Se descargo ${filename}.`,
     });
   };
 
   const handleExportCsv = () => {
-    const filename = `gastos-report-${fileSafeDate()}.csv`;
-    downloadTextFile(exportAsCsv(movements), filename, 'text/csv;charset=utf-8');
+    const filename = `gastos_${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadTextFile(exportAsCsv(filteredMovements), filename, 'text/csv;charset=utf-8');
     pushToast({
       tone: 'success',
       title: 'CSV exportado',
-      description: `Se descargó ${filename}.`,
+      description: `Se exportaron ${filteredMovements.length} movimientos filtrados.`,
     });
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true);
+    try {
+      const blob = await exportAsExcel(filteredMovements, filters);
+      const filename = `gastos_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      downloadBlobFile(blob, filename);
+      pushToast({
+        tone: 'success',
+        title: 'Excel exportado',
+        description: `Se genero ${filename} con ${filteredMovements.length} movimientos.`,
+      });
+    } catch (error) {
+      pushToast({
+        tone: 'error',
+        title: 'No se pudo exportar Excel',
+        description: error instanceof Error ? error.message : 'Revisa los datos e intenta nuevamente.',
+      });
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -59,7 +112,7 @@ export const BackupPage = ({ movements, onImportMovements }: BackupPageProps) =>
       pushToast({
         tone: 'error',
         title: 'No se pudo importar',
-        description: error instanceof Error ? error.message : 'Revisá el archivo y probá de nuevo.',
+        description: error instanceof Error ? error.message : 'Revisa el archivo y prueba de nuevo.',
       });
     } finally {
       setIsImporting(false);
@@ -74,22 +127,32 @@ export const BackupPage = ({ movements, onImportMovements }: BackupPageProps) =>
       </header>
 
       <p className="backup-text">
-        Exportá tus datos para hacer backups o descargá CSV para análisis. También podés importar un JSON para restaurar
-        datos en este dispositivo.
+        Exporta tus datos para backups o reportes. JSON exporta toda la base local. CSV y Excel exportan los movimientos
+        segun los filtros activos.
       </p>
+      <p className="backup-meta">{filterDescription}</p>
+      <p className="backup-meta">Movimientos filtrados listos para exportar: {filteredMovements.length}</p>
 
       <div className="backup-actions">
         <button type="button" className="button button-primary" onClick={handleExportJson}>
-          Exportar JSON
+          Exportar JSON (backup completo)
         </button>
         <button type="button" className="button button-secondary" onClick={handleExportCsv}>
           Exportar CSV
+        </button>
+        <button
+          type="button"
+          className="button button-secondary"
+          onClick={handleExportExcel}
+          disabled={isExportingExcel}
+        >
+          {isExportingExcel ? 'Exportando...' : 'Exportar Excel (.xlsx)'}
         </button>
       </div>
 
       <div className="backup-import">
         <label className="form-field">
-          <span>Estrategia de importación</span>
+          <span>Estrategia de importacion</span>
           <select className="field" value={strategy} onChange={(event) => setStrategy(event.target.value as 'merge' | 'replace')}>
             <option value="merge">Combinar con movimientos actuales</option>
             <option value="replace">Reemplazar todo</option>

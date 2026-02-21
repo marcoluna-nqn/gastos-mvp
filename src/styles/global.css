@@ -298,6 +298,45 @@ textarea {
   gap: 0.75rem;
 }
 
+.movement-type-control {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.amount-field {
+  min-height: 48px;
+  font-size: 1.1rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.amount-quick-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.chip-button {
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--text-main);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 150ms ease, border-color 150ms ease;
+}
+
+.chip-button:active {
+  transform: scale(0.97);
+}
+
+.chip-button:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+}
+
 .form-grid {
   display: grid;
   gap: 0.75rem;
@@ -455,6 +494,12 @@ textarea {
 .backup-text {
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+.backup-meta {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .backup-actions {

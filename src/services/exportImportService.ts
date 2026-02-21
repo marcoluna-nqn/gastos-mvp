@@ -113,16 +113,32 @@ export const exportAsCsv = (movements: MovementRecord[]): string => {
   return [headers.join(','), ...rows].join('\n');
 };
 
-export const downloadTextFile = (content: string, filename: string, mimeType: string): void => {
-  const blob = new Blob([content], { type: mimeType });
-  const objectUrl = URL.createObjectURL(blob);
+export const downloadBlobFile = (blob: Blob, filename: string): void => {
+  const navigatorWithMsSave = window.navigator as Navigator & {
+    msSaveOrOpenBlob?: (blobToSave: Blob, defaultName?: string) => boolean;
+  };
 
+  if (navigatorWithMsSave.msSaveOrOpenBlob) {
+    navigatorWithMsSave.msSaveOrOpenBlob(blob, filename);
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = objectUrl;
   link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
   link.click();
 
-  URL.revokeObjectURL(objectUrl);
+  window.setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+    link.remove();
+  }, 0);
+};
+
+export const downloadTextFile = (content: string, filename: string, mimeType: string): void => {
+  downloadBlobFile(new Blob([content], { type: mimeType }), filename);
 };
 
 export const parseJsonBackup = (raw: string): MovementDraft[] => {

@@ -1,6 +1,6 @@
 # Gastos MVP
 
-Aplicación web local-first para gestión de gastos personales. Permite registrar ingresos y gastos, filtrar por mes/categoría/tipo, ver gráficos reales y hacer backup/restauración sin backend.
+Aplicacion web local-first para gestion de gastos personales. Permite registrar ingresos y gastos, filtrar datos reales, ver graficos y hacer backup/restauracion sin backend.
 
 ## URL publicada
 
@@ -8,29 +8,32 @@ Aplicación web local-first para gestión de gastos personales. Permite registra
 
 ## Funcionalidades
 
-- CRUD completo de movimientos (crear, editar, eliminar con confirmación).
-- Campos por movimiento: `tipo`, `monto`, `categoría`, `fecha`, `método de pago`, `nota`.
-- Dashboard con datos reales:
+- CRUD completo de movimientos (crear, editar, eliminar con confirmacion).
+- Campos por movimiento: `tipo`, `monto`, `categoria`, `fecha`, `metodo de pago`, `nota`.
+- Dashboard conectado a datos reales:
   - Total ingresos
   - Total gastos
   - Balance
-  - Gráfico doughnut de gastos por categoría
-  - Gráfico lineal de evolución mensual
-- Filtros reales globales por `mes`, `categoría` y `tipo` (impactan dashboard y listado).
-- Historial con búsqueda y edición rápida.
-- Persistencia real en `IndexedDB` usando Dexie (sobrevive recargas).
+  - Grafico doughnut de gastos por categoria
+  - Grafico lineal de evolucion mensual
+- Filtros globales por `mes`, `categoria` y `tipo` (afectan dashboard, listado y exportes de reporte).
+- Historial con busqueda y edicion rapida.
+- Persistencia real en `IndexedDB` con Dexie.
 - Import/Export:
-  - Export JSON
-  - Export CSV
+  - Export JSON (backup completo de toda la base local)
+  - Export CSV (segun filtros activos)
+  - Export Excel real `.xlsx` con formato profesional (hojas `Movimientos` y `Resumen`)
   - Import JSON con estrategia `merge` o `replace`
 - UX robusta:
-  - Validaciones de formulario
+  - Validaciones claras de formulario
   - Formato moneda ARS (`es-AR`)
   - Manejo de decimales en centavos para evitar errores de flotantes
-  - Estados vacíos
+  - Edicion numerica mejorada: foco/select automatico en monto, parseo coma/punto y chips `+1000`, `+5000`, `+10000`
+  - Navegacion Enter/Next para carga rapida
+  - Estados vacios
   - Feedback visual con toasts
 - Responsive mobile-first con foco en iPhone Safari.
-- Manifest web básico para instalación en pantalla de inicio.
+- Manifest web basico para instalar en pantalla de inicio.
 - Modo claro/oscuro.
 
 ## Stack
@@ -38,6 +41,7 @@ Aplicación web local-first para gestión de gastos personales. Permite registra
 - React 19 + TypeScript + Vite
 - Dexie + IndexedDB
 - Chart.js + react-chartjs-2
+- ExcelJS para export `.xlsx`
 - React Router (`HashRouter` para GitHub Pages)
 - GitHub Actions + GitHub Pages
 
@@ -68,7 +72,7 @@ npm install
 npm run dev
 ```
 
-## Build producción
+## Build produccion
 
 ```bash
 npm run build
@@ -83,23 +87,23 @@ npm run lint
 ## Deploy en GitHub Pages
 
 1. Crear repo en GitHub.
-2. Subir este código a la rama `main`.
-3. En GitHub: `Settings > Pages`, seleccionar `GitHub Actions` como source.
+2. Subir el codigo a la rama `main`.
+3. En GitHub: `Settings > Pages`, seleccionar `GitHub Actions`.
 4. Hacer push a `main`.
-5. Esperar workflow `Deploy to GitHub Pages` (archivo `.github/workflows/deploy.yml`).
+5. Esperar el workflow `Deploy to GitHub Pages` (`.github/workflows/deploy.yml`).
 
-La base de Vite se calcula automáticamente desde `GITHUB_REPOSITORY` durante Actions y evita problemas en project pages (`/<repo>/`).
+La base de Vite se calcula automaticamente desde `GITHUB_REPOSITORY` durante Actions y evita problemas de rutas en project pages (`/<repo>/`).
 
-## Decisiones técnicas
+## Decisiones tecnicas
 
-- `amountCents` entero para cálculos financieros seguros.
+- `amountCents` entero para calculos financieros seguros.
 - Capa de DB separada (`db/` + `services/`) para mantener UI desacoplada.
-- Filtros globales compartidos entre páginas para consistencia de datos.
-- `HashRouter` para evitar 404 al recargar rutas en GitHub Pages.
-- `manualChunks` en Vite para separar `charts` y `storage` y mantener bundle controlado.
+- Filtros globales compartidos entre paginas.
+- `HashRouter` para evitar 404 al recargar en GitHub Pages.
+- `manualChunks` en Vite para separar `charts`, `storage` y carga diferida de `exceljs`.
 
 ## Notas de persistencia
 
 - Los datos viven en el navegador/dispositivo (IndexedDB).
-- Si borrás datos del navegador, se pierde la base local.
-- Recomendado: exportar JSON periódicamente como backup.
+- Si se borra almacenamiento del navegador, se pierde la base local.
+- Recomendado: exportar JSON periodicamente como backup.
