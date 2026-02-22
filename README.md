@@ -2,58 +2,53 @@
 
 Version estable: **v1.0.0**
 
-App web local-first para registrar movimientos personales en ARS, controlar el mes y exportar reportes sin depender de backend.
+App web local-first para gestionar gastos e ingresos personales en Argentina, con foco en carga rapida diaria, control mensual y exportacion.
 
 ## Demo en vivo
 
 - GitHub Pages: `https://marcoluna-nqn.github.io/gastos-mvp/`
 
-## Para quien sirve
+## Que resuelve
 
-- Personas en Argentina que quieren anotar gastos/ingresos rapido todos los dias.
-- Usuarios que prefieren una app simple, clara y sin friccion.
-- Quien necesita backup/export sin depender de servicios externos.
-
-## Que hace
-
-- Registra movimientos en segundos: monto, categoria, fecha y guardado.
-- Muestra resumen mensual en ARS (ingresos, gastos, balance).
-- Permite gestionar categorias y presupuestos por mes.
-- Da alertas in-app por vencimientos de pagos.
-- Exporta datos en JSON, CSV y XLSX.
-
-## Novedades (release v1.0.0)
-
-- Planilla editable tipo Excel para carga/edicion rapida.
-- Exportacion profesional a Excel (`.xlsx`).
-- Categorias personalizadas con alta rapida.
-- Presupuestos mensuales por categoria con alertas.
-- Vencimientos y recordatorios de pago dentro de la app.
+- Registrar movimientos en segundos, sin friccion.
+- Controlar el mes con resumen claro (ingresos, gastos y balance).
+- Recordar pagos con vencimiento desde la misma app.
+- Mantener tus datos bajo control con exportes y backup local.
 
 ## Funciones principales
 
-- CRUD completo de movimientos.
-- Filtros por mes, categoria y tipo.
-- Vista lista + vista planilla.
-- Dashboard mensual con resumen y analitica.
-- Importacion y restauracion desde JSON (`merge` o `replace`).
-- Persistencia local en IndexedDB (Dexie).
+- CRUD de movimientos con alta rapida simplificada.
+- Dashboard mensual en ARS.
+- Vencimientos y recordatorios in-app.
+- Planilla editable (modo avanzado).
+- Categorias personalizadas y presupuestos por categoria.
+- Exportacion en JSON, CSV y XLSX.
 
-## Uso rapido (1 minuto)
+## Como usarla en 30 segundos
 
 1. Entra a `Movimientos`.
-2. Carga monto, categoria y fecha.
-3. (Opcional) agrega vencimiento y activa recordatorio.
-4. Revisa `Dashboard` para ver resumen mensual y proximos vencimientos.
-5. Exporta backup desde `Backup`.
+2. Carga `tipo`, `monto` y `categoria`, y toca `Guardar`.
+3. Revisa `Dashboard` para el resumen mensual y usa `Exportar` para bajar JSON/CSV/XLSX.
+
+## Exportaciones
+
+- `JSON`: backup completo de la base local.
+- `CSV`: movimientos segun filtros activos.
+- `XLSX`: reporte Excel listo para compartir.
+
+## Privacidad
+
+- Los datos viven en tu navegador/dispositivo (IndexedDB con Dexie).
+- No se requiere backend para usar la app.
+- Si borras almacenamiento del navegador, se pierde la base local.
+- Recomendado: exportar JSON periodicamente como respaldo.
 
 ## Stack
 
-- React 19 + TypeScript + Vite
+- React 19
+- TypeScript
+- Vite
 - Dexie + IndexedDB
-- Chart.js + react-chartjs-2
-- ExcelJS
-- React Router (HashRouter para GitHub Pages)
 
 ## Desarrollo local
 
@@ -69,14 +64,6 @@ npm run lint
 npm run build
 ```
 
-## Deploy en GitHub Pages
+## Deploy
 
-El deploy corre automaticamente con GitHub Actions al hacer push a `main`.
-
-Workflow: `.github/workflows/deploy.yml`
-
-## Notas de datos
-
-- Los datos viven en el navegador del dispositivo.
-- Si borras almacenamiento del navegador, se pierde la base local.
-- Recomendado: exportar JSON periodicamente como backup.
+GitHub Pages via GitHub Actions (`.github/workflows/deploy.yml`).

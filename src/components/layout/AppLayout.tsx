@@ -37,7 +37,7 @@ export const AppLayout = ({
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Gastos personales</p>
+          <p className="eyebrow">Gastos personales | v1.0.0</p>
           <h1>Tu mes en ARS</h1>
         </div>
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
